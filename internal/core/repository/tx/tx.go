@@ -6,36 +6,38 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	pool "github.com/pkpal-uhobp/fulfillment-app/internal/core/repository/pool"
 )
 
 type Tx struct {
-	pool         *pool.ConnectionPool
-	queryTimeout time.Duration
+	pool      *pool.ConnectionPool
+	opTimeout time.Duration
 }
 
 func NewTx(db *pool.ConnectionPool) *Tx {
 	return &Tx{
-		pool:         db,
-		queryTimeout: db.QueryTimeout(),
+		pool:      db,
+		opTimeout: db.QueryTimeout(),
 	}
 }
 
-func (m *Tx) Querier(ctx context.Context) Querier {
+func (tx *Tx) Querier(ctx context.Context) Querier {
 	if q, ok := FromContext(ctx); ok {
 		return q
 	}
 
-	return m.pool.Pool
+	return tx.pool.Pool
 }
 
-func (m *Tx) WithinTransaction(
+func (tx *Tx) WithinTransaction(
 	ctx context.Context,
 	fn func(ctx context.Context) error,
 ) error {
-	return m.WithinTransactionOptions(ctx, pgx.TxOptions{}, fn)
+	return tx.WithinTransactionOptions(ctx, pgx.TxOptions{}, fn)
 }
 
-func (m *Tx) WithinTransactionOptions(
+func (tx *Tx) WithinTransactionOptions(
 	ctx context.Context,
 	opts pgx.TxOptions,
 	fn func(ctx context.Context) error,
@@ -44,10 +46,10 @@ func (m *Tx) WithinTransactionOptions(
 		return fn(ctx)
 	}
 
-	txCtx, cancel := context.WithTimeout(ctx, m.queryTimeout)
+	txCtx, cancel := context.WithTimeout(ctx, tx.opTimeout)
 	defer cancel()
 
-	dbTx, err := m.pool.BeginTx(txCtx, opts)
+	dbTx, err := tx.pool.BeginTx(txCtx, opts)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
