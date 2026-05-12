@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	core_logger "github.com/pkpal-uhobp/todo-app/internal/core/logger"
-	core_http_response "github.com/pkpal-uhobp/todo-app/internal/core/transport/http/response"
+	core_logger "github.com/pkpal-uhobp/fulfillment-app/internal/core/logger"
+	core_http_response "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/response"
 	"go.uber.org/zap"
 )
 

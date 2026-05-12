@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	core_logger "github.com/pkpal-uhobp/fulfillment-app/internal/core/logger"
-	core_http_middleware "github.com/pkpal-uhobp/todo-app/internal/core/transport/http/middleware"
+	core_http_middleware "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/middleware"
 	"go.uber.org/zap"
 )
 
