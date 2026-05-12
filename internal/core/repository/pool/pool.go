@@ -5,49 +5,55 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Pool interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Close()
-	OpTimeout() time.Duration
-}
-
 type ConnectionPool struct {
 	*pgxpool.Pool
-	opTimeout time.Duration
+	queryTimeout time.Duration
 }
 
 func NewConnectionPool(ctx context.Context, config Config) (*ConnectionPool, error) {
-	connectionString := fmt.Sprintf(""+
-		"postgresql://%s:%s@%s:%s/%s?sslmode=disable",
-		config.User, config.Password,
-		config.Host, config.Port, config.Database)
+	connectionString := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		config.User,
+		config.Password,
+		config.Host,
+		config.Port,
+		config.Database,
+		config.SSLMode,
+	)
 
-	pgxconfig, err := pgxpool.ParseConfig(connectionString)
+	pgxConfig, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("parse pgxconfig: %w", err)
+		return nil, fmt.Errorf("parse pgx config: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, pgxconfig)
+	pgxConfig.MaxConns = config.MaxConns
+	pgxConfig.MinConns = config.MinConns
+	pgxConfig.MaxConnLifetime = config.MaxConnLifetime
+	pgxConfig.MaxConnIdleTime = config.MaxConnIdleTime
+	pgxConfig.HealthCheckPeriod = config.HealthCheckPeriod
+
+	connectCtx, cancel := context.WithTimeout(ctx, config.ConnectTimeout)
+	defer cancel()
+
+	db, err := pgxpool.NewWithConfig(connectCtx, pgxConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create pgxpool: %w", err)
+		return nil, fmt.Errorf("create pgx pool: %w", err)
 	}
-	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("ping pgxpool: %w", err)
+
+	if err := db.Ping(connectCtx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ping pgx pool: %w", err)
 	}
 
 	return &ConnectionPool{
-		Pool:      pool,
-		opTimeout: config.Timeout,
+		Pool:         db,
+		queryTimeout: config.QueryTimeout,
 	}, nil
 }
 
-func (p *ConnectionPool) OpTimeout() time.Duration {
-	return p.opTimeout
+func (p *ConnectionPool) QueryTimeout() time.Duration {
+	return p.queryTimeout
 }

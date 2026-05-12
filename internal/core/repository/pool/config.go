@@ -8,27 +8,38 @@ import (
 )
 
 type Config struct {
-	Host     string        `envconfig:"HOST" required:"true"`
-	Port     string        `envconfig:"PORT" default:"5433"`
-	User     string        `envconfig:"USER" required:"true"`
-	Password string        `envconfig:"PASSWORD" required:"true"`
-	Database string        `envconfig:"DB" required:"true"`
-	Timeout  time.Duration `envconfig:"TIMEOUT" required:"true"`
+	Host     string `envconfig:"HOST" required:"true"`
+	Port     string `envconfig:"PORT" default:"5432"`
+	User     string `envconfig:"USER" required:"true"`
+	Password string `envconfig:"PASSWORD" required:"true"`
+	Database string `envconfig:"DB" required:"true"`
+	SSLMode  string `envconfig:"SSL_MODE" default:"disable"`
+
+	MaxConns          int32         `envconfig:"MAX_CONNS" default:"20"`
+	MinConns          int32         `envconfig:"MIN_CONNS" default:"2"`
+	MaxConnLifetime   time.Duration `envconfig:"MAX_CONN_LIFETIME" default:"1h"`
+	MaxConnIdleTime   time.Duration `envconfig:"MAX_CONN_IDLE_TIME" default:"30m"`
+	HealthCheckPeriod time.Duration `envconfig:"HEALTH_CHECK_PERIOD" default:"1m"`
+
+	ConnectTimeout time.Duration `envconfig:"CONNECT_TIMEOUT" default:"5s"`
+	QueryTimeout   time.Duration `envconfig:"QUERY_TIMEOUT" default:"5s"`
 }
 
 func NewConfig() (Config, error) {
 	var config Config
+
 	if err := envconfig.Process("POSTGRES", &config); err != nil {
-		return Config{}, fmt.Errorf("process envconfig: %w", err)
+		return Config{}, fmt.Errorf("process postgres config: %w", err)
 	}
+
 	return config, nil
 }
-func NewConfigMust() Config {
+
+func MustNewConfig() Config {
 	config, err := NewConfig()
 	if err != nil {
-		err = fmt.Errorf("get Postgres connection pool: %w", err)
-		panic(err)
-
+		panic(fmt.Errorf("get postgres connection pool config: %w", err))
 	}
+
 	return config
 }
