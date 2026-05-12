@@ -7,7 +7,7 @@ BEGIN;
 CREATE TABLE users (
                        id BIGSERIAL PRIMARY KEY,
 
-                       email VARCHAR(255) NOT NULL UNIQUE,
+                       email VARCHAR(255) NOT NULL,
                        password_hash TEXT NOT NULL,
 
                        full_name VARCHAR(255) NOT NULL,
@@ -26,15 +26,35 @@ CREATE TABLE users (
                        CONSTRAINT chk_users_email_not_empty
                            CHECK (length(trim(email)) > 0),
 
+                       CONSTRAINT chk_users_email_format
+                           CHECK (
+                               email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,63}$'
+                               ),
+
+                       CONSTRAINT chk_users_password_hash_not_empty
+                           CHECK (length(trim(password_hash)) > 0),
+
                        CONSTRAINT chk_users_full_name_not_empty
-                           CHECK (length(trim(full_name)) > 0)
+                           CHECK (length(trim(full_name)) > 0),
+
+                       CONSTRAINT chk_users_full_name_format
+                           CHECK (
+                               full_name ~ '^[A-Za-zА-Яа-яЁё]+([ .''-][A-Za-zА-Яа-яЁё]+)*$'
+                               ),
+
+                       CONSTRAINT chk_users_phone_format
+                           CHECK (
+                               phone IS NULL
+                                   OR phone ~ '^[+]?[0-9]{10,15}$'
+                               )
 );
 
 
 -- =========================================================
 -- 2. JWT TOKENS
 -- =========================================================
--- jti хранится в JWT и в БД. По нему можно проверить:
+-- jti хранится в JWT и в БД.
+-- По нему можно проверить:
 -- был ли токен выдан системой и не был ли он отозван.
 
 CREATE TABLE issued_tokens (
@@ -95,17 +115,41 @@ CREATE TABLE warehouses (
                             CONSTRAINT chk_warehouses_name_not_empty
                                 CHECK (length(trim(name)) > 0),
 
+                            CONSTRAINT chk_warehouses_name_format
+                                CHECK (
+                                    name ~ '^[A-Za-zА-Яа-яЁё0-9 .,''"№#()/_-]+$'
+                                    ),
+
+                            CONSTRAINT chk_warehouses_marketplace_format
+                                CHECK (
+                                    marketplace IS NULL
+                                        OR marketplace ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                    ),
+
                             CONSTRAINT chk_warehouses_city_not_empty
                                 CHECK (length(trim(city)) > 0),
 
+                            CONSTRAINT chk_warehouses_city_format
+                                CHECK (
+                                    city ~ '^[A-Za-zА-Яа-яЁё]+([ -][A-Za-zА-Яа-яЁё]+)*$'
+                                    ),
+
                             CONSTRAINT chk_warehouses_address_not_empty
-                                CHECK (length(trim(address)) > 0)
+                                CHECK (length(trim(address)) > 0),
+
+                            CONSTRAINT chk_warehouses_address_format
+                                CHECK (
+                                    address ~ '^[^[:cntrl:]]{5,500}$'
+                                    )
 );
 
 
 -- =========================================================
 -- 4. WORKER PROFILES
 -- =========================================================
+-- Подроли сотрудника убраны.
+-- Сотрудник определяется через users.role = 'worker',
+-- а его склад хранится в worker_profiles.warehouse_id.
 
 CREATE TABLE worker_profiles (
                                  id BIGSERIAL PRIMARY KEY,
@@ -113,12 +157,7 @@ CREATE TABLE worker_profiles (
                                  user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
                                  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
 
-                                 worker_type VARCHAR(50) NOT NULL,
-
-                                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-                                 CONSTRAINT chk_worker_profiles_type
-                                     CHECK (worker_type IN ('receiving', 'shipping', 'universal'))
+                                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -138,6 +177,11 @@ CREATE TABLE storage_zones (
 
                                CONSTRAINT chk_storage_zones_name_not_empty
                                    CHECK (length(trim(name)) > 0),
+
+                               CONSTRAINT chk_storage_zones_name_format
+                                   CHECK (
+                                       name ~ '^[A-Za-zА-Яа-яЁё0-9 ._/-]+$'
+                                       ),
 
                                CONSTRAINT uq_storage_zones_warehouse_name
                                    UNIQUE (warehouse_id, name)
@@ -159,6 +203,11 @@ CREATE TABLE gates (
                        CONSTRAINT chk_gates_name_not_empty
                            CHECK (length(trim(name)) > 0),
 
+                       CONSTRAINT chk_gates_name_format
+                           CHECK (
+                               name ~ '^[A-Za-zА-Яа-яЁё0-9 ._/-]+$'
+                               ),
+
                        CONSTRAINT uq_gates_warehouse_name
                            UNIQUE (warehouse_id, name)
 );
@@ -178,7 +227,12 @@ CREATE TABLE product_types (
                                is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
                                CONSTRAINT chk_product_types_name_not_empty
-                                   CHECK (length(trim(name)) > 0)
+                                   CHECK (length(trim(name)) > 0),
+
+                               CONSTRAINT chk_product_types_name_format
+                                   CHECK (
+                                       name ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                       )
 );
 
 
@@ -196,7 +250,12 @@ CREATE TABLE cargo_place_types (
                                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
                                    CONSTRAINT chk_cargo_place_types_name_not_empty
-                                       CHECK (length(trim(name)) > 0)
+                                       CHECK (length(trim(name)) > 0),
+
+                                   CONSTRAINT chk_cargo_place_types_name_format
+                                       CHECK (
+                                           name ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                           )
 );
 
 
@@ -341,6 +400,23 @@ CREATE TABLE pickup_requests (
                                  CONSTRAINT chk_pickup_requests_address_not_empty
                                      CHECK (length(trim(pickup_address)) > 0),
 
+                                 CONSTRAINT chk_pickup_requests_address_format
+                                     CHECK (
+                                         pickup_address ~ '^[^[:cntrl:]]{5,500}$'
+                                         ),
+
+                                 CONSTRAINT chk_pickup_requests_contact_name_format
+                                     CHECK (
+                                         contact_name IS NULL
+                                             OR contact_name ~ '^[A-Za-zА-Яа-яЁё]+([ .''-][A-Za-zА-Яа-яЁё]+)*$'
+                                         ),
+
+                                 CONSTRAINT chk_pickup_requests_contact_phone_format
+                                     CHECK (
+                                         contact_phone IS NULL
+                                             OR contact_phone ~ '^[+]?[0-9]{10,15}$'
+                                         ),
+
                                  CONSTRAINT chk_pickup_requests_time_range
                                      CHECK (
                                          (pickup_time_from IS NULL AND pickup_time_to IS NULL)
@@ -411,6 +487,11 @@ CREATE TABLE cargo_items (
 
                              CONSTRAINT chk_cargo_items_qr_code_not_empty
                                  CHECK (length(trim(qr_code)) > 0),
+
+                             CONSTRAINT chk_cargo_items_qr_code_format
+                                 CHECK (
+                                     qr_code ~ '^[-A-Za-z0-9._:/]{3,255}$'
+                                     ),
 
                              CONSTRAINT chk_cargo_items_shipped_data
                                  CHECK (
@@ -666,6 +747,20 @@ CREATE TABLE cargo_status_history (
 -- =========================================================
 -- UNIQUE и PRIMARY KEY уже создают индексы автоматически.
 -- Ниже — дополнительные индексы для частых JOIN, WHERE и фильтров.
+
+-- users
+CREATE UNIQUE INDEX uq_users_email_lower
+    ON users (lower(email));
+
+CREATE INDEX idx_users_role
+    ON users(role);
+
+CREATE INDEX idx_users_active
+    ON users(is_active);
+
+CREATE INDEX idx_users_blocked
+    ON users(is_blocked);
+
 
 -- issued_tokens
 CREATE INDEX idx_issued_tokens_user_id

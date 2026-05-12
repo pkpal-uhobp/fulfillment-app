@@ -6,68 +6,111 @@ import (
 	"fmt"
 	"net/http"
 
+	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 	core_logger "github.com/pkpal-uhobp/fulfillment-app/internal/core/logger"
 	core_http_middleware "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/middleware"
 	"go.uber.org/zap"
 )
 
 type HTTPServer struct {
-	mux        *http.ServeMux
-	config     Config
-	log        *core_logger.Logger
-	middleware []core_http_middleware.Middleware
+	mux         *http.ServeMux
+	config      Config
+	log         *core_logger.Logger
+	middlewares []core_http_middleware.Middleware
 }
 
-func NewHTTPServer(config Config,
+func NewHTTPServer(
+	config Config,
 	log *core_logger.Logger,
-	middleware ...core_http_middleware.Middleware) *HTTPServer {
-	return &HTTPServer{mux: http.NewServeMux(), config: config, log: log,
-		middleware: middleware}
+	middlewares ...core_http_middleware.Middleware,
+) *HTTPServer {
+	return &HTTPServer{
+		mux:         http.NewServeMux(),
+		config:      config,
+		log:         log,
+		middlewares: middlewares,
+	}
 }
-func (h *HTTPServer) RegisterAPIRouters(routes ...*APIVersionRouter) {
-	for _, router := range routes {
-		prefix := "/api/" + string(router.apiVersion)
-		h.mux.Handle(
+
+func (s *HTTPServer) RegisterAPIRouters(routers ...*APIVersionRouter) {
+	for _, router := range routers {
+		prefix := "/api/" + string(router.APIVersion())
+
+		s.mux.Handle(
 			prefix+"/",
 			http.StripPrefix(prefix, router),
 		)
 	}
 }
-func (h *HTTPServer) Run(ctx context.Context) error {
-	mux := core_http_middleware.ChainMiddlewares(h.mux, h.middleware...)
-	server := &http.Server{
-		Addr:    h.config.Addr,
-		Handler: mux,
+
+func (s *HTTPServer) Run(ctx context.Context) error {
+	handler := http.Handler(s.mux)
+
+	if len(s.middlewares) > 0 {
+		handler = core_http_middleware.ChainMiddlewares(
+			handler,
+			s.middlewares...,
+		)
 	}
 
-	ch := make(chan error, 1)
+	server := &http.Server{
+		Addr:         s.config.Addr,
+		Handler:      handler,
+		ReadTimeout:  s.config.ReadTimeout,
+		WriteTimeout: s.config.WriteTimeout,
+		IdleTimeout:  s.config.IdleTimeout,
+	}
+
+	errCh := make(chan error, 1)
 
 	go func() {
-		defer close(ch)
-		h.log.Warn("starting HTTP server on %s", zap.String("addr", h.config.Addr))
-		err := server.ListenAndServe()
+		s.log.Info(
+			"starting HTTP server",
+			zap.String("addr", s.config.Addr),
+		)
 
-		if !errors.Is(err, http.ErrServerClosed) {
-			ch <- err
+		if err := server.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf(
+				"%w: listen and serve HTTP: %v",
+				core_errors.ErrInternal,
+				err,
+			)
+			return
 		}
+
+		errCh <- nil
 	}()
 
 	select {
-	case err := <-ch:
+	case err := <-errCh:
 		if err != nil {
-			return fmt.Errorf("listen and server HTTP: %w", err)
+			return err
 		}
+
+		return nil
+
 	case <-ctx.Done():
-		h.log.Warn("shutting down HTTP server")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), h.config.ShutdownTimeout)
+		s.log.Info("shutting down HTTP server")
+
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			s.config.ShutdownTimeout,
+		)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			_ = server.Close()
 
-			return fmt.Errorf("shutdown HTTP server: %w", err)
+			return fmt.Errorf(
+				"%w: shutdown HTTP server: %v",
+				core_errors.ErrInternal,
+				err,
+			)
 		}
-		h.log.Warn("HTTP server stopped")
+
+		s.log.Info("HTTP server stopped")
+
+		return nil
 	}
-	return nil
 }
