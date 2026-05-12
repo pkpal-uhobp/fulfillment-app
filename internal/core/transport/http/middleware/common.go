@@ -21,32 +21,40 @@ func RequestID() Middleware {
 
 			r.Header.Set("X-Request-Id", requestID)
 			w.Header().Set("X-Request-Id", requestID)
-			next.ServeHTTP(w, r)
+
+			ctx := WithRequestID(r.Context(), requestID)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 func Logger(log *core_logger.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc((func(w http.ResponseWriter, r *http.Request) {
-			requestID := r.Header.Get("X-Request-Id")
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestID, _ := RequestIDFromContext(r.Context())
+			if requestID == "" {
+				requestID = r.Header.Get("X-Request-Id")
+			}
+
 			l := log.With(
 				zap.String("request_id", requestID),
+				zap.String("method", r.Method),
 				zap.String("url", r.URL.String()),
+				zap.String("remote_addr", r.RemoteAddr),
 			)
 
 			ctx := context.WithValue(r.Context(), "logger", l)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
-		}))
+		})
 	}
 }
 
 func Panic() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			log := core_logger.FromContext(ctx)
+			log := core_logger.FromContext(r.Context())
 			responseHandler := core_http_response.NewHTTPResponseHandler(log, w)
 
 			defer func() {
@@ -66,21 +74,37 @@ func Panic() Middleware {
 func Trace() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			log := core_logger.FromContext(ctx)
-			rw := core_http_response.NewResponseWriter(w)
+			log := core_logger.FromContext(r.Context())
+
+			rw := &statusResponseWriter{
+				ResponseWriter: w,
+				statusCode:     http.StatusOK,
+			}
+
 			before := time.Now()
+
 			log.Debug(
 				">>> incoming HTTP request",
-				zap.Time("time", before.UTC()))
+				zap.Time("time", before.UTC()),
+			)
 
 			next.ServeHTTP(rw, r)
 
 			log.Debug(
 				"<<< done HTTP request",
-				zap.Int("status_code", rw.GetStatusCodeOrPanic()),
-				zap.Duration("latency", time.Now().Sub(before)),
+				zap.Int("status_code", rw.statusCode),
+				zap.Duration("latency", time.Since(before)),
 			)
 		})
 	}
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
