@@ -9,7 +9,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (r *WarehousesRepository) DeactivateWarehouse(ctx context.Context, warehouseID int64) error {
+func (r *WarehousesRepository) ActivateWarehouse(ctx context.Context, warehouseID int64) error {
 	ctx, cancel := r.tx.WithTimeout(ctx)
 	defer cancel()
 
@@ -18,19 +18,19 @@ func (r *WarehousesRepository) DeactivateWarehouse(ctx context.Context, warehous
 	const query = `
 		WITH updated_warehouse AS (
 			UPDATE warehouses
-			SET is_active = false
+			SET is_active = true
 			WHERE id = $1
 			RETURNING id
 		),
 		updated_storage_zones AS (
 			UPDATE storage_zones
-			SET is_active = false
+			SET is_active = true
 			WHERE warehouse_id IN (SELECT id FROM updated_warehouse)
 			RETURNING id
 		),
 		updated_gates AS (
 			UPDATE gates
-			SET is_active = false
+			SET is_active = true
 			WHERE warehouse_id IN (SELECT id FROM updated_warehouse)
 			RETURNING id
 		)
@@ -43,7 +43,7 @@ func (r *WarehousesRepository) DeactivateWarehouse(ctx context.Context, warehous
 			return fmt.Errorf("%w: warehouse not found", core_errors.ErrNotFound)
 		}
 
-		return fmt.Errorf("deactivate warehouse: %w", err)
+		return fmt.Errorf("activate warehouse: %w", err)
 	}
 
 	return nil

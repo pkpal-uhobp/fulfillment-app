@@ -1,0 +1,5 @@
+BEGIN;
+
+DROP TABLE IF EXISTS issued_tokens;
+
+COMMIT;

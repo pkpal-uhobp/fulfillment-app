@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS gates;
+DROP TABLE IF EXISTS storage_zones;
+DROP TABLE IF EXISTS worker_profiles;
+
+COMMIT;
