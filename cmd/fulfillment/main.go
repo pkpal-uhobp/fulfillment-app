@@ -16,11 +16,15 @@ import (
 	core_http_middleware "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/middleware"
 	core_http_response "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/response"
 	core_http_server "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/server"
-
 	auth_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/repository/postgres"
 	auth_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/service"
 	auth_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/transport/http"
-
+	cargoitems_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/cargoitems/repository/postgres"
+	cargoitems_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/cargoitems/service"
+	cargoitems_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/cargoitems/transport/http"
+	orders_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/orders/repository/postgres"
+	orders_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/orders/service"
+	orders_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/orders/transport/http"
 	warehouses_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/repository/postgres"
 	warehouses_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/service"
 	warehouses_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/transport/http"
@@ -38,7 +42,6 @@ func main() {
 	defer stop()
 
 	logConfig := core_logger.NewConfigMust()
-
 	log, err := core_logger.NewLogger(logConfig)
 	if err != nil {
 		panic(err)
@@ -46,7 +49,6 @@ func main() {
 	defer log.Close()
 
 	postgresConfig := core_postgres_pool.NewConfigMust()
-
 	db, err := core_postgres_pool.NewConnectionPool(ctx, postgresConfig)
 	if err != nil {
 		log.Fatal("create postgres connection pool", zap.Error(err))
@@ -56,23 +58,18 @@ func main() {
 	txManager := core_postgres_tx.NewTx(db)
 
 	authRepo := auth_postgres.NewAuthRepository(txManager)
-
 	authConfig := auth_service.NewConfigMust()
-
 	authService := auth_service.NewAuthService(
 		txManager,
 		authRepo,
 		authConfig,
 	)
-
 	tokenVerifier := auth_http.NewAccessTokenVerifier(authService)
-
 	authMiddleware := core_http_middleware.Auth(tokenVerifier)
 
 	v1 := core_http_server.NewAPIVersionRouter(
 		core_http_server.ApiVersion1,
 	)
-
 	v1.SetRoleMiddleware(
 		core_http_middleware.RequireRoles(tokenVerifier),
 	)
@@ -84,26 +81,45 @@ func main() {
 		authService,
 		authMiddleware,
 	)
-
 	v1.RegisterRoutes(authHTTPHandler.Routes()...)
 
 	warehousesRepo := warehouses_postgres.NewWarehousesRepository(
 		txManager,
 	)
-
 	warehousesService := warehouses_service.NewWarehousesService(
 		warehousesRepo,
 	)
-
 	warehousesHTTPHandler := warehouses_http.NewWarehousesHTTPHandler(
 		log,
 		warehousesService,
 	)
-
 	v1.RegisterRoutes(warehousesHTTPHandler.Routes()...)
 
-	httpConfig := core_http_server.NewConfigMust()
+	ordersRepo := orders_postgres.NewOrdersRepository(
+		txManager,
+	)
+	ordersService := orders_service.NewOrdersService(
+		ordersRepo,
+	)
+	ordersHTTPHandler := orders_http.NewOrdersHTTPHandler(
+		log,
+		ordersService,
+	)
+	v1.RegisterRoutes(ordersHTTPHandler.Routes()...)
 
+	cargoItemsRepo := cargoitems_postgres.NewCargoItemsRepository(
+		txManager,
+	)
+	cargoItemsService := cargoitems_service.NewCargoItemsService(
+		cargoItemsRepo,
+	)
+	cargoItemsHTTPHandler := cargoitems_http.NewCargoItemsHTTPHandler(
+		log,
+		cargoItemsService,
+	)
+	v1.RegisterRoutes(cargoItemsHTTPHandler.Routes()...)
+
+	httpConfig := core_http_server.NewConfigMust()
 	httpServer := core_http_server.NewHTTPServer(
 		httpConfig,
 		log,
@@ -130,7 +146,6 @@ func registerHealthRoute(
 			"/health",
 			func(w http.ResponseWriter, r *http.Request) {
 				response := core_http_response.NewHTTPResponseHandler(log, w)
-
 				response.JSONResponse(
 					map[string]string{
 						"status": "ok",
@@ -145,7 +160,6 @@ func registerHealthRoute(
 
 func setTestDefaults() {
 	setDefaultEnv("HTTP_ADDR", ":8080")
-
 	setDefaultEnv("POSTGRES_HOST", "127.0.0.1")
 	setDefaultEnv("POSTGRES_PORT", "5433")
 	setDefaultEnv("POSTGRES_USER", "postgres")
@@ -153,7 +167,6 @@ func setTestDefaults() {
 	setDefaultEnv("POSTGRES_DB", "fulfillment-app")
 	setDefaultEnv("POSTGRES_SSL_MODE", "disable")
 	setDefaultEnv("POSTGRES_QUERY_TIMEOUT", "5s")
-
 	setDefaultEnv("JWT_SECRET", "dev-secret-for-test")
 	setDefaultEnv("JWT_ACCESS_TTL", "15m")
 	setDefaultEnv("JWT_REFRESH_TTL", "720h")
