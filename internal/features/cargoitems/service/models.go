@@ -52,6 +52,21 @@ type CargoItemDTO struct {
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
+type CargoItemLabelDTO struct {
+	CargoItemID       int64      `json:"cargo_item_id"`
+	OrderID           int64      `json:"order_id"`
+	OrderCargoPlaceID int64      `json:"order_cargo_place_id"`
+	CargoPlaceTypeID  int64      `json:"cargo_place_type_id"`
+	QRCode            string     `json:"qr_code"`
+	QRCodeValue       string     `json:"qr_code_value"`
+	Status            string     `json:"status"`
+	StorageZoneID     *int64     `json:"storage_zone_id,omitempty"`
+	GateID            *int64     `json:"gate_id,omitempty"`
+	ReceivedAt        *time.Time `json:"received_at,omitempty"`
+	ShippedAt         *time.Time `json:"shipped_at,omitempty"`
+	LabelText         string     `json:"label_text"`
+}
+
 type CargoStatusHistoryDTO struct {
 	ID          int64     `json:"id"`
 	CargoItemID int64     `json:"cargo_item_id"`

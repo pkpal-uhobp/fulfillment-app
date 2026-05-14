@@ -11,6 +11,8 @@ type fakeCargoItemsService struct {
 	createCargoItemFn       func(context.Context, int64, string, cargoitems_service.CreateCargoItemInput) (cargoitems_service.CargoItemDTO, error)
 	listCargoItemsFn        func(context.Context, int64, string, cargoitems_service.CargoItemFilter) ([]cargoitems_service.CargoItemDTO, error)
 	getCargoItemFn          func(context.Context, int64, int64, string) (cargoitems_service.CargoItemDTO, error)
+	scanCargoItemFn         func(context.Context, int64, string, string) (cargoitems_service.CargoItemDTO, error)
+	getCargoItemLabelFn     func(context.Context, int64, int64, string) (cargoitems_service.CargoItemLabelDTO, error)
 	getCargoItemHistoryFn   func(context.Context, int64, int64, string) ([]cargoitems_service.CargoStatusHistoryDTO, error)
 	updateCargoItemStatusFn func(context.Context, int64, int64, string, cargoitems_service.UpdateCargoItemStatusInput) (cargoitems_service.CargoItemDTO, error)
 	assignStorageZoneFn     func(context.Context, int64, int64, string, cargoitems_service.AssignStorageZoneInput) (cargoitems_service.CargoItemDTO, error)
@@ -36,6 +38,20 @@ func (f *fakeCargoItemsService) GetCargoItem(ctx context.Context, cargoItemID in
 		return cargoitems_service.CargoItemDTO{}, fmt.Errorf("unexpected GetCargoItem call")
 	}
 	return f.getCargoItemFn(ctx, cargoItemID, actorID, actorRole)
+}
+
+func (f *fakeCargoItemsService) ScanCargoItem(ctx context.Context, actorID int64, actorRole string, qrCode string) (cargoitems_service.CargoItemDTO, error) {
+	if f.scanCargoItemFn == nil {
+		return cargoitems_service.CargoItemDTO{}, fmt.Errorf("unexpected ScanCargoItem call")
+	}
+	return f.scanCargoItemFn(ctx, actorID, actorRole, qrCode)
+}
+
+func (f *fakeCargoItemsService) GetCargoItemLabel(ctx context.Context, cargoItemID int64, actorID int64, actorRole string) (cargoitems_service.CargoItemLabelDTO, error) {
+	if f.getCargoItemLabelFn == nil {
+		return cargoitems_service.CargoItemLabelDTO{}, fmt.Errorf("unexpected GetCargoItemLabel call")
+	}
+	return f.getCargoItemLabelFn(ctx, cargoItemID, actorID, actorRole)
 }
 
 func (f *fakeCargoItemsService) GetCargoItemHistory(ctx context.Context, cargoItemID int64, actorID int64, actorRole string) ([]cargoitems_service.CargoStatusHistoryDTO, error) {

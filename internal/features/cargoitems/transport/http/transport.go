@@ -37,6 +37,20 @@ type CargoItemsService interface {
 		actorRole string,
 	) (cargoitems_service.CargoItemDTO, error)
 
+	ScanCargoItem(
+		ctx context.Context,
+		actorID int64,
+		actorRole string,
+		qrCode string,
+	) (cargoitems_service.CargoItemDTO, error)
+
+	GetCargoItemLabel(
+		ctx context.Context,
+		cargoItemID int64,
+		actorID int64,
+		actorRole string,
+	) (cargoitems_service.CargoItemLabelDTO, error)
+
 	GetCargoItemHistory(
 		ctx context.Context,
 		cargoItemID int64,
@@ -103,8 +117,30 @@ func (h *CargoItemsHTTPHandler) Routes() []core_http_server.Route {
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
+			"/cargo-items/scan",
+			h.ScanCargoItem,
+			[]string{
+				core_domain.RoleClient.String(),
+				core_domain.RoleWorker.String(),
+				core_domain.RoleLogist.String(),
+				core_domain.RoleAdmin.String(),
+			},
+		),
+		core_http_server.NewRoute(
+			http.MethodGet,
 			"/cargo-items/{id}",
 			h.GetCargoItem,
+			[]string{
+				core_domain.RoleClient.String(),
+				core_domain.RoleWorker.String(),
+				core_domain.RoleLogist.String(),
+				core_domain.RoleAdmin.String(),
+			},
+		),
+		core_http_server.NewRoute(
+			http.MethodGet,
+			"/cargo-items/{id}/label",
+			h.GetCargoItemLabel,
 			[]string{
 				core_domain.RoleClient.String(),
 				core_domain.RoleWorker.String(),

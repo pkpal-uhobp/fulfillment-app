@@ -398,3 +398,88 @@ func TestGetCargoItemHistoryChecksAccessAndMapsDTO(t *testing.T) {
 		t.Fatalf("unexpected history: %+v", history)
 	}
 }
+
+func TestScanCargoItemByQRCodeSuccessScopesClient(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fakeCargoItemsRepository{
+		listCargoItemsFn: func(ctx context.Context, filter core_domain.CargoItemFilter) ([]core_domain.CargoItem, error) {
+			if filter.QRCode != "QR-SCAN-001" {
+				t.Fatalf("QRCode = %q, want QR-SCAN-001", filter.QRCode)
+			}
+			if filter.ClientID == nil || *filter.ClientID != 42 {
+				t.Fatalf("ClientID = %v, want 42", filter.ClientID)
+			}
+			if filter.Page != 1 || filter.Limit != 1 {
+				t.Fatalf("page/limit = %d/%d, want 1/1", filter.Page, filter.Limit)
+			}
+			return []core_domain.CargoItem{{ID: 7, OrderID: 10, QRCode: "QR-SCAN-001", Status: core_domain.CargoItemStatusStored, CreatedAt: now, UpdatedAt: now}}, nil
+		},
+	}
+	service := cargoitems_service.NewCargoItemsService(repo)
+
+	dto, err := service.ScanCargoItem(context.Background(), 42, core_domain.RoleClient.String(), " QR-SCAN-001 ")
+	if err != nil {
+		t.Fatalf("ScanCargoItem returned error: %v", err)
+	}
+	if dto.ID != 7 || dto.QRCode != "QR-SCAN-001" {
+		t.Fatalf("unexpected dto: %+v", dto)
+	}
+}
+
+func TestScanCargoItemRejectsEmptyQRCode(t *testing.T) {
+	service := cargoitems_service.NewCargoItemsService(&fakeCargoItemsRepository{})
+
+	_, err := service.ScanCargoItem(context.Background(), 42, core_domain.RoleWorker.String(), "   ")
+	if !errors.Is(err, core_errors.ErrInvalidArgument) {
+		t.Fatalf("err = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestScanCargoItemReturnsNotFound(t *testing.T) {
+	repo := &fakeCargoItemsRepository{
+		listCargoItemsFn: func(ctx context.Context, filter core_domain.CargoItemFilter) ([]core_domain.CargoItem, error) {
+			return nil, nil
+		},
+	}
+	service := cargoitems_service.NewCargoItemsService(repo)
+
+	_, err := service.ScanCargoItem(context.Background(), 42, core_domain.RoleWorker.String(), "QR-MISSING")
+	if !errors.Is(err, core_errors.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGetCargoItemLabelSuccess(t *testing.T) {
+	now := time.Now().UTC()
+	zoneID := int64(9)
+	gateID := int64(4)
+	repo := &fakeCargoItemsRepository{
+		getCargoItemFn: func(ctx context.Context, cargoItemID int64) (core_domain.CargoItem, error) {
+			if cargoItemID != 7 {
+				t.Fatalf("cargoItemID = %d, want 7", cargoItemID)
+			}
+			return core_domain.CargoItem{
+				ID:                cargoItemID,
+				OrderID:           10,
+				OrderCargoPlaceID: 20,
+				CargoPlaceTypeID:  3,
+				QRCode:            "QR-LABEL-001",
+				Status:            core_domain.CargoItemStatusStored,
+				StorageZoneID:     &zoneID,
+				GateID:            &gateID,
+				ReceivedAt:        &now,
+				CreatedAt:         now,
+				UpdatedAt:         now,
+			}, nil
+		},
+	}
+	service := cargoitems_service.NewCargoItemsService(repo)
+
+	label, err := service.GetCargoItemLabel(context.Background(), 7, 5, core_domain.RoleWorker.String())
+	if err != nil {
+		t.Fatalf("GetCargoItemLabel returned error: %v", err)
+	}
+	if label.CargoItemID != 7 || label.QRCodeValue != "QR-LABEL-001" || !strings.Contains(label.LabelText, "ORDER-10") {
+		t.Fatalf("unexpected label: %+v", label)
+	}
+}

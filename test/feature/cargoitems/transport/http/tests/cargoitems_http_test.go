@@ -23,7 +23,9 @@ func TestRoutesExposeCargoItemsEndpoints(t *testing.T) {
 	expected := map[string][]string{
 		"POST /orders/{id}/cargo-items":       {core_domain.RoleWorker.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items":                    {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
+		"GET /cargo-items/scan":               {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items/{id}":               {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
+		"GET /cargo-items/{id}/label":         {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items/{id}/history":       {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"PATCH /cargo-items/{id}/status":      {core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"PATCH /cargo-items/{id}/assign-zone": {core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
@@ -280,4 +282,63 @@ func newTestLogger(t *testing.T) *core_logger.Logger {
 	}
 	t.Cleanup(log.Close)
 	return log
+}
+
+func TestScanCargoItemHTTP(t *testing.T) {
+	service := &fakeCargoItemsService{
+		scanCargoItemFn: func(ctx context.Context, actorID int64, actorRole string, qrCode string) (cargoitems_service.CargoItemDTO, error) {
+			if actorID != 5 || actorRole != core_domain.RoleWorker.String() || qrCode != "QR-SCAN-001" {
+				t.Fatalf("unexpected args: %d/%q/%q", actorID, actorRole, qrCode)
+			}
+			return cargoitems_service.CargoItemDTO{ID: 7, QRCode: qrCode, Status: "stored"}, nil
+		},
+	}
+	handler := cargoitems_transport_http.NewCargoItemsHTTPHandler(newTestLogger(t), service)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cargo-items/scan?qr_code=QR-SCAN-001", nil)
+	req = req.WithContext(core_http_middleware.WithUser(req.Context(), core_http_middleware.CurrentUser{ID: 5, Role: core_domain.RoleWorker.String()}))
+	rr := httptest.NewRecorder()
+
+	handler.ScanCargoItem(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var response cargoitems_transport_http.CargoItemResponse
+	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.CargoItem.ID != 7 || response.CargoItem.QRCode != "QR-SCAN-001" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestGetCargoItemLabelHTTP(t *testing.T) {
+	service := &fakeCargoItemsService{
+		getCargoItemLabelFn: func(ctx context.Context, cargoItemID int64, actorID int64, actorRole string) (cargoitems_service.CargoItemLabelDTO, error) {
+			if cargoItemID != 7 || actorID != 42 || actorRole != core_domain.RoleClient.String() {
+				t.Fatalf("unexpected args: %d/%d/%q", cargoItemID, actorID, actorRole)
+			}
+			return cargoitems_service.CargoItemLabelDTO{CargoItemID: cargoItemID, OrderID: 10, QRCode: "QR-LABEL-001", QRCodeValue: "QR-LABEL-001", Status: "stored", LabelText: "ORDER-10 | CARGO-7 | QR-LABEL-001"}, nil
+		},
+	}
+	handler := cargoitems_transport_http.NewCargoItemsHTTPHandler(newTestLogger(t), service)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cargo-items/7/label", nil)
+	req.SetPathValue("id", "7")
+	req = req.WithContext(core_http_middleware.WithUser(req.Context(), core_http_middleware.CurrentUser{ID: 42, Role: core_domain.RoleClient.String()}))
+	rr := httptest.NewRecorder()
+
+	handler.GetCargoItemLabel(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var response cargoitems_transport_http.CargoItemLabelResponse
+	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Label.CargoItemID != 7 || response.Label.QRCodeValue != "QR-LABEL-001" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
 }

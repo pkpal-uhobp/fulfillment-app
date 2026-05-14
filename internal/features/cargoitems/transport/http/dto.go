@@ -34,3 +34,7 @@ type CargoItemsResponse struct {
 type CargoItemHistoryResponse struct {
 	History []cargoitems_service.CargoStatusHistoryDTO `json:"history"`
 }
+
+type CargoItemLabelResponse struct {
+	Label cargoitems_service.CargoItemLabelDTO `json:"label"`
+}
