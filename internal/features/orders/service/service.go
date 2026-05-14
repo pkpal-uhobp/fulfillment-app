@@ -25,6 +25,11 @@ type OrdersRepository interface {
 		orderID int64,
 	) (core_domain.OrderDetails, error)
 
+	ListOrderStatusHistory(
+		ctx context.Context,
+		orderID int64,
+	) ([]core_domain.OrderStatusHistory, error)
+
 	CancelOrder(
 		ctx context.Context,
 		orderID int64,

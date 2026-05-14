@@ -9,9 +9,7 @@ const (
 	HandoverTypeSelfDelivery HandoverType = "self_delivery"
 )
 
-func (t HandoverType) String() string {
-	return string(t)
-}
+func (t HandoverType) String() string { return string(t) }
 
 type OrderStatus string
 
@@ -27,9 +25,7 @@ const (
 	OrderStatusCancelled          OrderStatus = "cancelled"
 )
 
-func (s OrderStatus) String() string {
-	return string(s)
-}
+func (s OrderStatus) String() string { return string(s) }
 
 type Order struct {
 	ID                     int64
@@ -82,8 +78,23 @@ type OrderDetails struct {
 	Pickup      *PickupRequest
 }
 
+type OrderStatusHistory struct {
+	ID        int64
+	OrderID   int64
+	OldStatus *OrderStatus
+	NewStatus OrderStatus
+	ChangedBy int64
+	Comment   *string
+	ChangedAt time.Time
+}
+
 type OrderFilter struct {
-	ClientID     *int64
-	Status       string
-	HandoverType string
+	ClientID               *int64
+	Status                 string
+	HandoverType           string
+	WarehouseID            *int64
+	ReceivingWarehouseID   *int64
+	DestinationWarehouseID *int64
+	Page                   int
+	Limit                  int
 }

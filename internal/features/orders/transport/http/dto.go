@@ -51,3 +51,7 @@ type OrdersResponse struct {
 type OrderResponse struct {
 	Order orders_service.OrderDTO `json:"order"`
 }
+
+type OrderHistoryResponse struct {
+	History []orders_service.OrderStatusHistoryDTO `json:"history"`
+}

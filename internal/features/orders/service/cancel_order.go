@@ -32,6 +32,10 @@ func (s *OrdersService) CancelOrder(
 		return fmt.Errorf("%w: order cannot be cancelled from current status", core_errors.ErrInvalidArgument)
 	}
 
+	if err := validateOrderStatusTransition(order.Order.HandoverType, order.Order.Status, core_domain.OrderStatusCancelled); err != nil {
+		return err
+	}
+
 	if err := s.repo.CancelOrder(ctx, orderID, actorID, input.Comment); err != nil {
 		return fmt.Errorf("cancel order: %w", err)
 	}

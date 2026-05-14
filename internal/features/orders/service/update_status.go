@@ -27,7 +27,7 @@ func (s *OrdersService) UpdateOrderStatus(
 		return OrderDTO{}, fmt.Errorf("get order before status update: %w", err)
 	}
 
-	if err := validateStatusMatchesHandoverType(order.Order.HandoverType, newStatus); err != nil {
+	if err := validateOrderStatusTransition(order.Order.HandoverType, order.Order.Status, newStatus); err != nil {
 		return OrderDTO{}, err
 	}
 

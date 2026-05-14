@@ -62,6 +62,27 @@ func mapOrderDetailsListToDTO(details []core_domain.OrderDetails) []OrderDTO {
 	for _, order := range details {
 		orders = append(orders, mapOrderDetailsToDTO(order))
 	}
-
 	return orders
+}
+
+func mapOrderStatusHistoryListToDTO(history []core_domain.OrderStatusHistory) []OrderStatusHistoryDTO {
+	result := make([]OrderStatusHistoryDTO, 0, len(history))
+	for _, item := range history {
+		var oldStatus *string
+		if item.OldStatus != nil {
+			value := item.OldStatus.String()
+			oldStatus = &value
+		}
+
+		result = append(result, OrderStatusHistoryDTO{
+			ID:        item.ID,
+			OrderID:   item.OrderID,
+			OldStatus: oldStatus,
+			NewStatus: item.NewStatus.String(),
+			ChangedBy: item.ChangedBy,
+			Comment:   item.Comment,
+			ChangedAt: item.ChangedAt,
+		})
+	}
+	return result
 }

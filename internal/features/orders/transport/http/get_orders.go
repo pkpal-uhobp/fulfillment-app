@@ -24,14 +24,49 @@ func (h *OrdersHTTPHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	warehouseID, err := core_http_utils.QueryInt64Ptr(r, "warehouse_id")
+	if err != nil {
+		response.ErrorResponse(err, "invalid warehouse id")
+		return
+	}
+
+	receivingWarehouseID, err := core_http_utils.QueryInt64Ptr(r, "receiving_warehouse_id")
+	if err != nil {
+		response.ErrorResponse(err, "invalid receiving warehouse id")
+		return
+	}
+
+	destinationWarehouseID, err := core_http_utils.QueryInt64Ptr(r, "destination_warehouse_id")
+	if err != nil {
+		response.ErrorResponse(err, "invalid destination warehouse id")
+		return
+	}
+
+	page, err := queryInt(r, "page")
+	if err != nil {
+		response.ErrorResponse(err, "invalid page")
+		return
+	}
+
+	limit, err := queryInt(r, "limit")
+	if err != nil {
+		response.ErrorResponse(err, "invalid limit")
+		return
+	}
+
 	orders, err := h.ordersService.ListOrders(
 		r.Context(),
 		user.ID,
 		user.Role,
 		orders_service.OrderFilter{
-			ClientID:     clientID,
-			Status:      core_http_utils.QueryString(r, "status"),
-			HandoverType: core_http_utils.QueryString(r, "handover_type"),
+			ClientID:               clientID,
+			Status:                 core_http_utils.QueryString(r, "status"),
+			HandoverType:           core_http_utils.QueryString(r, "handover_type"),
+			WarehouseID:            warehouseID,
+			ReceivingWarehouseID:   receivingWarehouseID,
+			DestinationWarehouseID: destinationWarehouseID,
+			Page:                   page,
+			Limit:                  limit,
 		},
 	)
 	if err != nil {
@@ -45,4 +80,15 @@ func (h *OrdersHTTPHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 		},
 		http.StatusOK,
 	)
+}
+
+func queryInt(r *http.Request, name string) (int, error) {
+	value, err := core_http_utils.QueryInt64Ptr(r, name)
+	if err != nil {
+		return 0, err
+	}
+	if value == nil {
+		return 0, nil
+	}
+	return int(*value), nil
 }
