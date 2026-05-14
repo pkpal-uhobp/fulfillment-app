@@ -14,13 +14,6 @@ const (
 	contextKeyRequestID contextKey = "request_id"
 )
 
-const (
-	RoleClient = "client"
-	RoleLogist = "logist"
-	RoleWorker = "worker"
-	RoleAdmin  = "admin"
-)
-
 type CurrentUser struct {
 	ID   int64
 	Role string

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	headerAuthorization = "Authorization"
+	authSchemeBearer    = "bearer"
+)
+
 type AccessTokenClaims struct {
 	UserID int64
 	Role   string
@@ -78,7 +83,7 @@ func verifyRequestAccessToken(
 }
 
 func bearerTokenFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
-	authHeader := r.Header.Get("Authorization")
+	authHeader := r.Header.Get(headerAuthorization)
 	if authHeader == "" {
 		writeMiddlewareError(
 			w,
@@ -89,7 +94,7 @@ func bearerTokenFromRequest(w http.ResponseWriter, r *http.Request) (string, boo
 	}
 
 	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+	if len(parts) != 2 || strings.ToLower(parts[0]) != authSchemeBearer {
 		writeMiddlewareError(
 			w,
 			http.StatusUnauthorized,

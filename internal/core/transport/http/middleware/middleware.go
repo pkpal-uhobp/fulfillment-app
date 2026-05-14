@@ -4,13 +4,13 @@ import "net/http"
 
 type Middleware func(handler http.Handler) http.Handler
 
-func ChainMiddlewares(h http.Handler, m ...Middleware) http.Handler {
-	if len(m) == 0 {
+func ChainMiddlewares(h http.Handler, middlewares ...Middleware) http.Handler {
+	if len(middlewares) == 0 {
 		return h
 	}
 
-	for i := len(m) - 1; i >= 0; i-- {
-		h = m[i](h)
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		h = middlewares[i](h)
 	}
 
 	return h

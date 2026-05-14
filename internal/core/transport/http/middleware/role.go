@@ -32,8 +32,9 @@ func RequireRoles(verifier AccessTokenVerifier) func(roles ...string) Middleware
 					r = r.WithContext(WithUser(r.Context(), user))
 				}
 
-				role := strings.ToLower(strings.TrimSpace(user.Role))
-				if _, ok := allowedRoles[role]; !ok {
+				userRole := strings.ToLower(strings.TrimSpace(user.Role))
+
+				if _, ok := allowedRoles[userRole]; !ok {
 					writeMiddlewareError(
 						w,
 						http.StatusForbidden,

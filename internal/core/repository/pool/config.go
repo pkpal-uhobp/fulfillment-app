@@ -35,7 +35,7 @@ func NewConfig() (Config, error) {
 	return config, nil
 }
 
-func MustNewConfig() Config {
+func NewConfigMust() Config {
 	config, err := NewConfig()
 	if err != nil {
 		panic(fmt.Errorf("get postgres connection pool config: %w", err))

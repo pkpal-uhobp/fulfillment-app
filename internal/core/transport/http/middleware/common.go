@@ -37,14 +37,14 @@ func Logger(log *core_logger.Logger) Middleware {
 				requestID = r.Header.Get("X-Request-Id")
 			}
 
-			l := log.With(
+			requestLogger := log.With(
 				zap.String("request_id", requestID),
 				zap.String("method", r.Method),
 				zap.String("url", r.URL.String()),
 				zap.String("remote_addr", r.RemoteAddr),
 			)
 
-			ctx := context.WithValue(r.Context(), "logger", l)
+			ctx := context.WithValue(r.Context(), "logger", requestLogger)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -81,11 +81,11 @@ func Trace() Middleware {
 				statusCode:     http.StatusOK,
 			}
 
-			before := time.Now()
+			startedAt := time.Now()
 
 			log.Debug(
 				">>> incoming HTTP request",
-				zap.Time("time", before.UTC()),
+				zap.Time("time", startedAt.UTC()),
 			)
 
 			next.ServeHTTP(rw, r)
@@ -93,7 +93,7 @@ func Trace() Middleware {
 			log.Debug(
 				"<<< done HTTP request",
 				zap.Int("status_code", rw.statusCode),
-				zap.Duration("latency", time.Since(before)),
+				zap.Duration("latency", time.Since(startedAt)),
 			)
 		})
 	}
@@ -107,4 +107,8 @@ type statusResponseWriter struct {
 func (w *statusResponseWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *statusResponseWriter) Write(data []byte) (int, error) {
+	return w.ResponseWriter.Write(data)
 }

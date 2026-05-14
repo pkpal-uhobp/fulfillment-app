@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-
 	pool "github.com/pkpal-uhobp/fulfillment-app/internal/core/repository/pool"
 )
 
@@ -28,6 +27,14 @@ func (tx *Tx) Querier(ctx context.Context) Querier {
 	}
 
 	return tx.pool.Pool
+}
+
+func (tx *Tx) WithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := FromContext(ctx); ok {
+		return ctx, func() {}
+	}
+
+	return context.WithTimeout(ctx, tx.opTimeout)
 }
 
 func (tx *Tx) WithinTransaction(
