@@ -4,12 +4,13 @@ import (
 	"net/http"
 
 	core_http_response "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/response"
+	core_http_utils "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/utils"
 )
 
 func (h *WarehousesHTTPHandler) ActivateGate(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
 
-	gateID, err := pathInt64(r, "id")
+	gateID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid gate id")
 		return
@@ -26,7 +27,7 @@ func (h *WarehousesHTTPHandler) ActivateGate(w http.ResponseWriter, r *http.Requ
 func (h *WarehousesHTTPHandler) DeactivateGate(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
 
-	gateID, err := pathInt64(r, "id")
+	gateID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid gate id")
 		return
