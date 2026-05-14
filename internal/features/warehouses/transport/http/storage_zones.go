@@ -5,13 +5,14 @@ import (
 
 	core_http_request "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/request"
 	core_http_response "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/response"
+	core_http_utils "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/utils"
 	warehouses_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/service"
 )
 
 func (h *WarehousesHTTPHandler) ListStorageZones(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
 
-	warehouseID, err := queryInt64(r, "warehouse_id")
+	warehouseID, err := core_http_utils.QueryInt64(r, "warehouse_id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid warehouse id")
 		return
@@ -54,7 +55,7 @@ func (h *WarehousesHTTPHandler) CreateStorageZone(w http.ResponseWriter, r *http
 func (h *WarehousesHTTPHandler) PatchStorageZone(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
 
-	zoneID, err := pathInt64(r, "id")
+	zoneID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid storage zone id")
 		return
