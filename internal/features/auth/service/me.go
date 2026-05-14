@@ -9,7 +9,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (s *Service) GetMe(
+func (s *AuthService) GetMe(
 	ctx context.Context,
 	userID int64,
 ) (UserDTO, error) {

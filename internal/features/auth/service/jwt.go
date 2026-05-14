@@ -20,7 +20,7 @@ type tokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (s *Service) generateToken(
+func (s *AuthService) generateToken(
 	userID int64,
 	role core_domain.Role,
 	tokenType core_domain.TokenType,
@@ -54,7 +54,7 @@ func (s *Service) generateToken(
 	return signedToken, jti, expiresAt, nil
 }
 
-func (s *Service) parseToken(tokenString string) (*tokenClaims, error) {
+func (s *AuthService) parseToken(tokenString string) (*tokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		&tokenClaims{},
@@ -75,7 +75,7 @@ func (s *Service) parseToken(tokenString string) (*tokenClaims, error) {
 	return claims, nil
 }
 
-func (s *Service) issueTokenPair(
+func (s *AuthService) issueTokenPair(
 	ctx context.Context,
 	user core_domain.User,
 	deviceID uuid.UUID,

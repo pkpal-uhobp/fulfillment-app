@@ -8,12 +8,12 @@ import (
 	core_postgres_tx "github.com/pkpal-uhobp/fulfillment-app/internal/core/repository/tx"
 )
 
-type Repository struct {
+type AuthRepository struct {
 	tx *core_postgres_tx.Tx
 }
 
-func NewRepository(tx *core_postgres_tx.Tx) *Repository {
-	return &Repository{
+func NewAuthRepository(tx *core_postgres_tx.Tx) *AuthRepository {
+	return &AuthRepository{
 		tx: tx,
 	}
 }

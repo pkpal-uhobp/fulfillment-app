@@ -12,7 +12,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (s *Service) Refresh(
+func (s *AuthService) Refresh(
 	ctx context.Context,
 	input RefreshInput,
 ) (TokenPair, error) {

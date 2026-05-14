@@ -9,7 +9,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (r *Repository) CreateUser(
+func (r *AuthRepository) CreateUser(
 	ctx context.Context,
 	user core_domain.User,
 ) (core_domain.User, error) {

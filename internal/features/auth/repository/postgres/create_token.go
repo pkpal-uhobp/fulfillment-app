@@ -7,7 +7,7 @@ import (
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 )
 
-func (r *Repository) CreateIssuedToken(
+func (r *AuthRepository) CreateIssuedToken(
 	ctx context.Context,
 	token core_domain.IssuedToken,
 ) error {

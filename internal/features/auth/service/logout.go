@@ -11,7 +11,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (s *Service) Logout(
+func (s *AuthService) Logout(
 	ctx context.Context,
 	input LogoutInput,
 ) error {

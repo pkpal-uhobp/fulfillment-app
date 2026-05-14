@@ -11,7 +11,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (s *Service) Login(
+func (s *AuthService) Login(
 	ctx context.Context,
 	input LoginInput,
 ) (UserDTO, TokenPair, error) {

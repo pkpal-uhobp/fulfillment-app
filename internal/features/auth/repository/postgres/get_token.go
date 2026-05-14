@@ -11,7 +11,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (r *Repository) GetIssuedTokenByJTI(
+func (r *AuthRepository) GetIssuedTokenByJTI(
 	ctx context.Context,
 	jti uuid.UUID,
 ) (core_domain.IssuedToken, error) {

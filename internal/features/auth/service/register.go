@@ -11,7 +11,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (s *Service) Register(
+func (s *AuthService) Register(
 	ctx context.Context,
 	input RegisterInput,
 ) (UserDTO, TokenPair, error) {

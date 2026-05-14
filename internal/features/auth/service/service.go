@@ -15,7 +15,7 @@ type TransactionManager interface {
 	) error
 }
 
-type Repository interface {
+type AuthRepository interface {
 	CreateUser(
 		ctx context.Context,
 		user core_domain.User,
@@ -55,18 +55,18 @@ type Repository interface {
 	) error
 }
 
-type Service struct {
+type AuthService struct {
 	tx     TransactionManager
-	repo   Repository
+	repo   AuthRepository
 	config Config
 }
 
-func NewService(
+func NewAuthService(
 	tx TransactionManager,
-	repo Repository,
+	repo AuthRepository,
 	config Config,
-) *Service {
-	return &Service{
+) *AuthService {
+	return &AuthService{
 		tx:     tx,
 		repo:   repo,
 		config: config,

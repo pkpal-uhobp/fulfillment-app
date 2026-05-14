@@ -11,7 +11,7 @@ import (
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
-func (r *Repository) GetUserByEmail(
+func (r *AuthRepository) GetUserByEmail(
 	ctx context.Context,
 	email string,
 ) (core_domain.User, error) {
@@ -34,7 +34,7 @@ func (r *Repository) GetUserByEmail(
 	return scanUser(q.QueryRow(ctx, query, email))
 }
 
-func (r *Repository) GetUserByID(
+func (r *AuthRepository) GetUserByID(
 	ctx context.Context,
 	userID int64,
 ) (core_domain.User, error) {

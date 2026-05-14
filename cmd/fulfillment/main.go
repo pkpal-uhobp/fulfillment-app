@@ -50,11 +50,11 @@ func main() {
 
 	txManager := core_postgres_tx.NewTx(db)
 
-	authRepo := auth_postgres.NewRepository(txManager)
+	authRepo := auth_postgres.NewAuthRepository(txManager)
 
 	authConfig := auth_service.NewConfigMust()
 
-	authService := auth_service.NewService(
+	authService := auth_service.NewAuthService(
 		txManager,
 		authRepo,
 		authConfig,
@@ -74,13 +74,13 @@ func main() {
 
 	registerHealthRoute(v1, log)
 
-	authTransport := auth_http.NewTransport(
+	authHTTPHandler := auth_http.NewAuthHTTPHandler(
 		log,
 		authService,
 		authMiddleware,
 	)
 
-	authTransport.RegisterRoutes(v1)
+	v1.RegisterRoutes(authHTTPHandler.Routes()...)
 
 	httpConfig := core_http_server.NewConfigMust()
 

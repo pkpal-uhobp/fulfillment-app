@@ -4,16 +4,15 @@ import (
 	"context"
 
 	core_http_middleware "github.com/pkpal-uhobp/fulfillment-app/internal/core/transport/http/middleware"
-	auth_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/service"
 )
 
 type AccessTokenVerifier struct {
-	service *auth_service.Service
+	authService AuthService
 }
 
-func NewAccessTokenVerifier(service *auth_service.Service) *AccessTokenVerifier {
+func NewAccessTokenVerifier(authService AuthService) *AccessTokenVerifier {
 	return &AccessTokenVerifier{
-		service: service,
+		authService: authService,
 	}
 }
 
@@ -21,7 +20,7 @@ func (v *AccessTokenVerifier) VerifyAccessToken(
 	ctx context.Context,
 	token string,
 ) (*core_http_middleware.AccessTokenClaims, error) {
-	claims, err := v.service.VerifyAccessToken(ctx, token)
+	claims, err := v.authService.VerifyAccessToken(ctx, token)
 	if err != nil {
 		return nil, err
 	}

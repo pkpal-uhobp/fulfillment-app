@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (r *Repository) RevokeTokenByJTI(
+func (r *AuthRepository) RevokeTokenByJTI(
 	ctx context.Context,
 	jti uuid.UUID,
 	reason string,
@@ -32,7 +32,7 @@ func (r *Repository) RevokeTokenByJTI(
 	return nil
 }
 
-func (r *Repository) RevokeActiveTokensByDevice(
+func (r *AuthRepository) RevokeActiveTokensByDevice(
 	ctx context.Context,
 	userID int64,
 	deviceID uuid.UUID,
