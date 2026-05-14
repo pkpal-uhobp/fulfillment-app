@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
@@ -15,13 +14,9 @@ func (s *AuthService) Register(
 	ctx context.Context,
 	input RegisterInput,
 ) (UserDTO, TokenPair, error) {
-	email := normalizeEmail(input.Email)
-
-	if email == "" ||
-		strings.TrimSpace(input.Password) == "" ||
-		strings.TrimSpace(input.FullName) == "" {
+	if strings.TrimSpace(input.Password) == "" {
 		return UserDTO{}, TokenPair{}, fmt.Errorf(
-			"%w: required fields are empty",
+			"%w: password is required",
 			core_errors.ErrInvalidArgument,
 		)
 	}
@@ -38,26 +33,30 @@ func (s *AuthService) Register(
 		return UserDTO{}, TokenPair{}, fmt.Errorf("hash password: %w", err)
 	}
 
+	var phone *string
+	if strings.TrimSpace(input.Phone) != "" {
+		p := strings.TrimSpace(input.Phone)
+		phone = &p
+	}
+
+	newUser, err := core_domain.NewUser(
+		input.Email,
+		passwordHash,
+		input.FullName,
+		phone,
+		core_domain.RoleClient,
+	)
+	if err != nil {
+		return UserDTO{}, TokenPair{}, err
+	}
+
 	var (
 		user   core_domain.User
 		tokens TokenPair
 	)
 
 	err = s.tx.WithinTransaction(ctx, func(ctx context.Context) error {
-		var phone *string
-
-		if strings.TrimSpace(input.Phone) != "" {
-			p := strings.TrimSpace(input.Phone)
-			phone = &p
-		}
-
-		createdUser, err := s.repo.CreateUser(ctx, core_domain.User{
-			Email:        email,
-			PasswordHash: passwordHash,
-			FullName:     strings.TrimSpace(input.FullName),
-			Phone:        phone,
-			Role:         core_domain.RoleClient,
-		})
+		createdUser, err := s.repo.CreateUser(ctx, newUser)
 		if err != nil {
 			return err
 		}

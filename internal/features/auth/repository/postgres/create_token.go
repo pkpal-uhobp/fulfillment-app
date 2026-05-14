@@ -11,6 +11,9 @@ func (r *AuthRepository) CreateIssuedToken(
 	ctx context.Context,
 	token core_domain.IssuedToken,
 ) error {
+	ctx, cancel := r.tx.WithTimeout(ctx)
+	defer cancel()
+
 	q := r.tx.Querier(ctx)
 
 	const query = `

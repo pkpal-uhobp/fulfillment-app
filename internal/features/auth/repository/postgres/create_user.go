@@ -13,6 +13,9 @@ func (r *AuthRepository) CreateUser(
 	ctx context.Context,
 	user core_domain.User,
 ) (core_domain.User, error) {
+	ctx, cancel := r.tx.WithTimeout(ctx)
+	defer cancel()
+
 	q := r.tx.Querier(ctx)
 
 	const query = `
@@ -24,15 +27,7 @@ func (r *AuthRepository) CreateUser(
 			role
 		)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING
-			id,
-			email,
-			password_hash,
-			full_name,
-			phone,
-			role,
-			is_active,
-			is_blocked;
+		RETURNING id, email, password_hash, full_name, phone, role, is_active, is_blocked;
 	`
 
 	var (
@@ -73,7 +68,6 @@ func (r *AuthRepository) CreateUser(
 	if phone.Valid {
 		result.Phone = &phone.String
 	}
-
 	result.Role = core_domain.Role(roleValue)
 
 	return result, nil

@@ -37,4 +37,4 @@ migrate-action:
     		"${action}"
 
 fulfillment-app-run:
-	set "LOGGER_FOLDER=%CD%\out\logs" && set "POSTGRES_HOST=127.0.0.1" && go mod tidy && go run .\cmd\todoapp\main.go
+	set "LOGGER_FOLDER=%CD%\out\logs" && set "POSTGRES_HOST=127.0.0.1" && go mod tidy && go run .\cmd\fulfillment\main.go

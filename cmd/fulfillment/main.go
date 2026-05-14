@@ -24,6 +24,7 @@ import (
 
 func main() {
 	_ = godotenv.Load()
+	setTestDefaults()
 
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
@@ -121,4 +122,26 @@ func registerHealthRoute(
 			nil,
 		),
 	)
+}
+
+func setTestDefaults() {
+	setDefaultEnv("HTTP_ADDR", ":8080")
+
+	setDefaultEnv("POSTGRES_HOST", "127.0.0.1")
+	setDefaultEnv("POSTGRES_PORT", "5433")
+	setDefaultEnv("POSTGRES_USER", "postgres")
+	setDefaultEnv("POSTGRES_PASSWORD", "postgres")
+	setDefaultEnv("POSTGRES_DB", "fulfillment")
+	setDefaultEnv("POSTGRES_SSL_MODE", "disable")
+	setDefaultEnv("POSTGRES_QUERY_TIMEOUT", "5s")
+
+	setDefaultEnv("JWT_SECRET", "dev-secret-for-test")
+	setDefaultEnv("JWT_ACCESS_TTL", "15m")
+	setDefaultEnv("JWT_REFRESH_TTL", "720h")
+}
+
+func setDefaultEnv(key string, value string) {
+	if os.Getenv(key) == "" {
+		_ = os.Setenv(key, value)
+	}
 }

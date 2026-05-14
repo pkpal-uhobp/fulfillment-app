@@ -16,19 +16,23 @@ type validatable interface {
 }
 
 func DecodeAndValidateRequest(r *http.Request, dest any) error {
-	if err := json.NewDecoder(r.Body).Decode(dest); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(dest); err != nil {
 		return fmt.Errorf("decode json: %v: %w", err, core_errors.ErrInvalidArgument)
 	}
 
-	v, ok := dest.(validatable)
-	if ok {
+	if v, ok := dest.(validatable); ok {
 		if err := v.Validate(); err != nil {
 			return fmt.Errorf("validate json: %v: %w", err, core_errors.ErrInvalidArgument)
-		} else {
-			if err := requestValidator.Struct(dest); err != nil {
-				return fmt.Errorf("request validation: %v: %w", err, core_errors.ErrInvalidArgument)
-			}
 		}
+
+		return nil
+	}
+
+	if err := requestValidator.Struct(dest); err != nil {
+		return fmt.Errorf("request validation: %v: %w", err, core_errors.ErrInvalidArgument)
 	}
 
 	return nil

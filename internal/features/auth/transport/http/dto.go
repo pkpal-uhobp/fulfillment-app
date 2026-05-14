@@ -3,10 +3,10 @@ package auth_transport_http
 import auth_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/service"
 
 type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	FullName string `json:"full_name"`
-	Phone    string `json:"phone"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
+	FullName string `json:"full_name" validate:"required,min=2,max=255"`
+	Phone    string `json:"phone,omitempty" validate:"omitempty,min=10,max=16"`
 }
 
 type RegisterResponse struct {
@@ -15,9 +15,9 @@ type RegisterResponse struct {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	DeviceID string `json:"device_id"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+	DeviceID string `json:"device_id,omitempty" validate:"omitempty,uuid"`
 }
 
 type LoginResponse struct {
@@ -26,7 +26,7 @@ type LoginResponse struct {
 }
 
 type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 type RefreshResponse struct {
@@ -34,7 +34,7 @@ type RefreshResponse struct {
 }
 
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 type MeResponse struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 )
 

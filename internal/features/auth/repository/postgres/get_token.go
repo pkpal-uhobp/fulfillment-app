@@ -15,17 +15,13 @@ func (r *AuthRepository) GetIssuedTokenByJTI(
 	ctx context.Context,
 	jti uuid.UUID,
 ) (core_domain.IssuedToken, error) {
+	ctx, cancel := r.tx.WithTimeout(ctx)
+	defer cancel()
+
 	q := r.tx.Querier(ctx)
 
 	const query = `
-		SELECT
-			id,
-			user_id,
-			jti,
-			token_type,
-			device_id,
-			revoked,
-			expires_at
+		SELECT id, user_id, jti, token_type, device_id, revoked, expires_at
 		FROM issued_tokens
 		WHERE jti = $1;
 	`

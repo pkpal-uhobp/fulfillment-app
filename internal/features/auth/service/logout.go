@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )

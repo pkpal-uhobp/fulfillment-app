@@ -2,12 +2,12 @@ package auth_service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
@@ -48,10 +48,14 @@ func (s *AuthService) VerifyAccessToken(
 
 	issuedToken, err := s.repo.GetIssuedTokenByJTI(ctx, jti)
 	if err != nil {
-		return AuthClaims{}, fmt.Errorf(
-			"%w: access token not found",
-			core_errors.ErrUnauthorized,
-		)
+		if errors.Is(err, core_errors.ErrNotFound) {
+			return AuthClaims{}, fmt.Errorf(
+				"%w: access token not found",
+				core_errors.ErrUnauthorized,
+			)
+		}
+
+		return AuthClaims{}, err
 	}
 
 	if issuedToken.UserID != claims.UserID {

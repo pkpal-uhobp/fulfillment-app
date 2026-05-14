@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
 	core_postgres_tx "github.com/pkpal-uhobp/fulfillment-app/internal/core/repository/tx"
 )
 
@@ -20,7 +19,6 @@ func NewAuthRepository(tx *core_postgres_tx.Tx) *AuthRepository {
 
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
-
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == "23505"
 	}

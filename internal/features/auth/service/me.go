@@ -13,6 +13,10 @@ func (s *AuthService) GetMe(
 	ctx context.Context,
 	userID int64,
 ) (UserDTO, error) {
+	if userID <= 0 {
+		return UserDTO{}, fmt.Errorf("%w: invalid user id", core_errors.ErrInvalidArgument)
+	}
+
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return UserDTO{}, err

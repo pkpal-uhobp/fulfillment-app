@@ -2,12 +2,12 @@ package auth_service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
@@ -55,14 +55,17 @@ func (s *AuthService) Refresh(
 	}
 
 	var tokens TokenPair
-
 	err = s.tx.WithinTransaction(ctx, func(ctx context.Context) error {
 		issuedToken, err := s.repo.GetIssuedTokenByJTI(ctx, jti)
 		if err != nil {
-			return fmt.Errorf(
-				"%w: refresh token not found",
-				core_errors.ErrUnauthorized,
-			)
+			if errors.Is(err, core_errors.ErrNotFound) {
+				return fmt.Errorf(
+					"%w: refresh token not found",
+					core_errors.ErrUnauthorized,
+				)
+			}
+
+			return err
 		}
 
 		if issuedToken.UserID != claims.UserID {
@@ -91,6 +94,13 @@ func (s *AuthService) Refresh(
 		}
 
 		if err := s.repo.RevokeTokenByJTI(ctx, jti, "refresh token rotated"); err != nil {
+			if errors.Is(err, core_errors.ErrNotFound) {
+				return fmt.Errorf(
+					"%w: refresh token is not active",
+					core_errors.ErrUnauthorized,
+				)
+			}
+
 			return err
 		}
 

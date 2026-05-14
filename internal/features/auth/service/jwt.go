@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
 )
 
@@ -16,7 +15,6 @@ type tokenClaims struct {
 	Role      string `json:"role"`
 	TokenType string `json:"token_type"`
 	DeviceID  string `json:"device_id"`
-
 	jwt.RegisteredClaims
 }
 
@@ -45,7 +43,6 @@ func (s *AuthService) generateToken(
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
 	signedToken, err := token.SignedString([]byte(s.config.JWTSecret))
 	if err != nil {
 		return "", uuid.Nil, time.Time{}, fmt.Errorf("sign JWT: %w", err)

@@ -15,18 +15,13 @@ func (r *AuthRepository) GetUserByEmail(
 	ctx context.Context,
 	email string,
 ) (core_domain.User, error) {
+	ctx, cancel := r.tx.WithTimeout(ctx)
+	defer cancel()
+
 	q := r.tx.Querier(ctx)
 
 	const query = `
-		SELECT
-			id,
-			email,
-			password_hash,
-			full_name,
-			phone,
-			role,
-			is_active,
-			is_blocked
+		SELECT id, email, password_hash, full_name, phone, role, is_active, is_blocked
 		FROM users
 		WHERE lower(email) = lower($1);
 	`
@@ -38,18 +33,13 @@ func (r *AuthRepository) GetUserByID(
 	ctx context.Context,
 	userID int64,
 ) (core_domain.User, error) {
+	ctx, cancel := r.tx.WithTimeout(ctx)
+	defer cancel()
+
 	q := r.tx.Querier(ctx)
 
 	const query = `
-		SELECT
-			id,
-			email,
-			password_hash,
-			full_name,
-			phone,
-			role,
-			is_active,
-			is_blocked
+		SELECT id, email, password_hash, full_name, phone, role, is_active, is_blocked
 		FROM users
 		WHERE id = $1;
 	`
@@ -88,7 +78,6 @@ func scanUser(row pgx.Row) (core_domain.User, error) {
 	if phone.Valid {
 		user.Phone = &phone.String
 	}
-
 	user.Role = core_domain.Role(roleValue)
 
 	return user, nil

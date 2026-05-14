@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	core_errors "github.com/pkpal-uhobp/fulfillment-app/internal/core/errors"
 )
 
@@ -16,7 +15,6 @@ func (s *AuthService) Login(
 	input LoginInput,
 ) (UserDTO, TokenPair, error) {
 	email := normalizeEmail(input.Email)
-
 	if email == "" || strings.TrimSpace(input.Password) == "" {
 		return UserDTO{}, TokenPair{}, fmt.Errorf(
 			"%w: empty email or password",
@@ -48,7 +46,6 @@ func (s *AuthService) Login(
 	}
 
 	deviceID := uuid.New()
-
 	if strings.TrimSpace(input.DeviceID) != "" {
 		parsedDeviceID, err := uuid.Parse(strings.TrimSpace(input.DeviceID))
 		if err != nil {
@@ -62,7 +59,6 @@ func (s *AuthService) Login(
 	}
 
 	var tokens TokenPair
-
 	err = s.tx.WithinTransaction(ctx, func(ctx context.Context) error {
 		tokenPair, err := s.issueTokenPair(ctx, user, deviceID)
 		if err != nil {
