@@ -83,9 +83,16 @@ CREATE TABLE issued_tokens (
 
                                CONSTRAINT chk_issued_tokens_revoked_data
                                    CHECK (
-                                       (revoked = FALSE AND revoked_at IS NULL)
+                                       (
+                                           revoked = FALSE
+                                               AND revoked_at IS NULL
+                                               AND revoked_reason IS NULL
+                                           )
                                            OR
-                                       (revoked = TRUE AND revoked_at IS NOT NULL)
+                                       (
+                                           revoked = TRUE
+                                               AND revoked_at IS NOT NULL
+                                           )
                                        )
 );
 
@@ -123,7 +130,7 @@ CREATE TABLE warehouses (
                             CONSTRAINT chk_warehouses_marketplace_format
                                 CHECK (
                                     marketplace IS NULL
-                                        OR marketplace ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                        OR marketplace ~ '^[A-Za-zА-Яа-яЁё0-9 ._/-]+$'
                                     ),
 
                             CONSTRAINT chk_warehouses_city_not_empty
@@ -139,7 +146,8 @@ CREATE TABLE warehouses (
 
                             CONSTRAINT chk_warehouses_address_format
                                 CHECK (
-                                    address ~ '^[^[:cntrl:]]{5,500}$'
+                                    length(trim(address)) BETWEEN 5 AND 500
+                                        AND address !~ '[[:cntrl:]]'
                                     )
 );
 
@@ -231,7 +239,7 @@ CREATE TABLE product_types (
 
                                CONSTRAINT chk_product_types_name_format
                                    CHECK (
-                                       name ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                       name ~ '^[A-Za-zА-Яа-яЁё0-9 ._/-]+$'
                                        )
 );
 
@@ -254,7 +262,7 @@ CREATE TABLE cargo_place_types (
 
                                    CONSTRAINT chk_cargo_place_types_name_format
                                        CHECK (
-                                           name ~ '^[A-Za-zА-Яа-яЁё0-9 ._-]+$'
+                                           name ~ '^[A-Za-zА-Яа-яЁё0-9 ._/-]+$'
                                            )
 );
 
@@ -402,7 +410,8 @@ CREATE TABLE pickup_requests (
 
                                  CONSTRAINT chk_pickup_requests_address_format
                                      CHECK (
-                                         pickup_address ~ '^[^[:cntrl:]]{5,500}$'
+                                         length(trim(pickup_address)) BETWEEN 5 AND 500
+                                             AND pickup_address !~ '[[:cntrl:]]'
                                          ),
 
                                  CONSTRAINT chk_pickup_requests_contact_name_format
@@ -490,7 +499,8 @@ CREATE TABLE cargo_items (
 
                              CONSTRAINT chk_cargo_items_qr_code_format
                                  CHECK (
-                                     qr_code ~ '^[-A-Za-z0-9._:/]{3,255}$'
+                                     length(trim(qr_code)) BETWEEN 3 AND 255
+                                         AND qr_code ~ '^[-A-Za-z0-9._:/]+$'
                                      ),
 
                              CONSTRAINT chk_cargo_items_shipped_data
@@ -623,6 +633,12 @@ CREATE TABLE shipments (
                                               'completed',
                                               'cancelled'
                                        )
+                                   ),
+
+                           CONSTRAINT chk_shipments_actual_departure
+                               CHECK (
+                                   actual_departure_at IS NULL
+                                       OR actual_departure_at >= planned_departure_at
                                    )
 );
 
@@ -743,7 +759,40 @@ CREATE TABLE cargo_status_history (
 
 
 -- =========================================================
--- 20. INDEXES
+-- 20. UPDATED_AT TRIGGERS
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+    RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_set_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_orders_set_updated_at
+    BEFORE UPDATE ON orders
+    FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_pickup_requests_set_updated_at
+    BEFORE UPDATE ON pickup_requests
+    FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_cargo_items_set_updated_at
+    BEFORE UPDATE ON cargo_items
+    FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+
+-- =========================================================
+-- 21. INDEXES
 -- =========================================================
 -- UNIQUE и PRIMARY KEY уже создают индексы автоматически.
 -- Ниже — дополнительные индексы для частых JOIN, WHERE и фильтров.
@@ -968,7 +1017,7 @@ CREATE INDEX idx_cargo_status_history_changed_at
 
 
 -- =========================================================
--- 21. SEED DATA
+-- 22. SEED DATA
 -- =========================================================
 
 INSERT INTO product_types (name, description) VALUES

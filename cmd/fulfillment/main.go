@@ -20,6 +20,10 @@ import (
 	auth_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/repository/postgres"
 	auth_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/service"
 	auth_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/auth/transport/http"
+
+	warehouses_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/repository/postgres"
+	warehouses_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/service"
+	warehouses_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/transport/http"
 )
 
 func main() {
@@ -83,6 +87,21 @@ func main() {
 
 	v1.RegisterRoutes(authHTTPHandler.Routes()...)
 
+	warehousesRepo := warehouses_postgres.NewWarehousesRepository(
+		txManager,
+	)
+
+	warehousesService := warehouses_service.NewWarehousesService(
+		warehousesRepo,
+	)
+
+	warehousesHTTPHandler := warehouses_http.NewWarehousesHTTPHandler(
+		log,
+		warehousesService,
+	)
+
+	v1.RegisterRoutes(warehousesHTTPHandler.Routes()...)
+
 	httpConfig := core_http_server.NewConfigMust()
 
 	httpServer := core_http_server.NewHTTPServer(
@@ -131,7 +150,7 @@ func setTestDefaults() {
 	setDefaultEnv("POSTGRES_PORT", "5433")
 	setDefaultEnv("POSTGRES_USER", "postgres")
 	setDefaultEnv("POSTGRES_PASSWORD", "postgres")
-	setDefaultEnv("POSTGRES_DB", "fulfillment")
+	setDefaultEnv("POSTGRES_DB", "fulfillment-app")
 	setDefaultEnv("POSTGRES_SSL_MODE", "disable")
 	setDefaultEnv("POSTGRES_QUERY_TIMEOUT", "5s")
 
