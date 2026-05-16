@@ -22,42 +22,36 @@ type CargoItemsService interface {
 		actorRole string,
 		input cargoitems_service.CreateCargoItemInput,
 	) (cargoitems_service.CargoItemDTO, error)
-
 	ListCargoItems(
 		ctx context.Context,
 		actorID int64,
 		actorRole string,
 		filter cargoitems_service.CargoItemFilter,
 	) ([]cargoitems_service.CargoItemDTO, error)
-
 	GetCargoItem(
 		ctx context.Context,
 		cargoItemID int64,
 		actorID int64,
 		actorRole string,
 	) (cargoitems_service.CargoItemDTO, error)
-
 	ScanCargoItem(
 		ctx context.Context,
 		actorID int64,
 		actorRole string,
 		qrCode string,
 	) (cargoitems_service.CargoItemDTO, error)
-
 	GetCargoItemLabel(
 		ctx context.Context,
 		cargoItemID int64,
 		actorID int64,
 		actorRole string,
 	) (cargoitems_service.CargoItemLabelDTO, error)
-
 	GetCargoItemHistory(
 		ctx context.Context,
 		cargoItemID int64,
 		actorID int64,
 		actorRole string,
 	) ([]cargoitems_service.CargoStatusHistoryDTO, error)
-
 	UpdateCargoItemStatus(
 		ctx context.Context,
 		cargoItemID int64,
@@ -65,7 +59,6 @@ type CargoItemsService interface {
 		actorRole string,
 		input cargoitems_service.UpdateCargoItemStatusInput,
 	) (cargoitems_service.CargoItemDTO, error)
-
 	AssignStorageZone(
 		ctx context.Context,
 		cargoItemID int64,
@@ -73,7 +66,6 @@ type CargoItemsService interface {
 		actorRole string,
 		input cargoitems_service.AssignStorageZoneInput,
 	) (cargoitems_service.CargoItemDTO, error)
-
 	AssignGate(
 		ctx context.Context,
 		cargoItemID int64,
@@ -94,6 +86,22 @@ func NewCargoItemsHTTPHandler(
 }
 
 func (h *CargoItemsHTTPHandler) Routes() []core_http_server.Route {
+	clientWorkerLogistAdminRoles := []string{
+		core_domain.RoleClient.String(),
+		core_domain.RoleWorker.String(),
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+	workerLogistAdminRoles := []string{
+		core_domain.RoleWorker.String(),
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+	logistAdminRoles := []string{
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+
 	return []core_http_server.Route{
 		core_http_server.NewRoute(
 			http.MethodPost,
@@ -108,84 +116,49 @@ func (h *CargoItemsHTTPHandler) Routes() []core_http_server.Route {
 			http.MethodGet,
 			"/cargo-items",
 			h.ListCargoItems,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/scan",
 			h.ScanCargoItem,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			workerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}",
 			h.GetCargoItem,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}/label",
 			h.GetCargoItemLabel,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			workerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}/history",
 			h.GetCargoItemHistory,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/status",
 			h.UpdateCargoItemStatus,
-			[]string{
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			workerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/assign-zone",
 			h.AssignStorageZone,
-			[]string{
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			logistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/assign-gate",
 			h.AssignGate,
-			[]string{
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			logistAdminRoles,
 		),
 	}
 }

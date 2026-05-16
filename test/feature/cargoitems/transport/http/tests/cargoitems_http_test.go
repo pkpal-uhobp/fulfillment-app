@@ -23,9 +23,9 @@ func TestRoutesExposeCargoItemsEndpoints(t *testing.T) {
 	expected := map[string][]string{
 		"POST /orders/{id}/cargo-items":       {core_domain.RoleWorker.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items":                    {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
-		"GET /cargo-items/scan":               {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
+		"GET /cargo-items/scan":               {core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items/{id}":               {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
-		"GET /cargo-items/{id}/label":         {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
+		"GET /cargo-items/{id}/label":         {core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"GET /cargo-items/{id}/history":       {core_domain.RoleClient.String(), core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"PATCH /cargo-items/{id}/status":      {core_domain.RoleWorker.String(), core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},
 		"PATCH /cargo-items/{id}/assign-zone": {core_domain.RoleLogist.String(), core_domain.RoleAdmin.String()},

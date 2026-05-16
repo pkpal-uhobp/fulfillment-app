@@ -28,12 +28,12 @@ All paths are relative to `/api/v1`.
 | PATCH | /warehouses/{id} | Admin |
 | PATCH | /warehouses/{id}/activate | Admin |
 | DELETE | /warehouses/{id} | Admin |
-| GET | /storage-zones | - |
+| GET | /storage-zones | Worker, Logist, Admin |
 | POST | /storage-zones | Admin |
 | PATCH | /storage-zones/{id} | Admin |
 | PATCH | /storage-zones/{id}/activate | Admin |
 | DELETE | /storage-zones/{id} | Admin |
-| GET | /gates | - |
+| GET | /gates | Worker, Logist, Admin |
 | POST | /gates | Admin |
 | PATCH | /gates/{id} | Admin |
 | PATCH | /gates/{id}/activate | Admin |
@@ -54,7 +54,7 @@ All paths are relative to `/api/v1`.
 
 | Method | Path | Roles |
 | --- | --- | --- |
-| POST | /orders | Client, Admin |
+| POST | /orders | Client |
 | GET | /orders | Client, Logist, Admin |
 | GET | /orders/{id} | Client, Logist, Admin |
 | GET | /orders/{id}/history | Client, Logist, Admin |
@@ -67,9 +67,9 @@ All paths are relative to `/api/v1`.
 | --- | --- | --- |
 | POST | /orders/{id}/cargo-items | Worker, Admin |
 | GET | /cargo-items | Client, Worker, Logist, Admin |
-| GET | /cargo-items/scan | Client, Worker, Logist, Admin |
+| GET | /cargo-items/scan | Worker, Logist, Admin |
 | GET | /cargo-items/{id} | Client, Worker, Logist, Admin |
-| GET | /cargo-items/{id}/label | Client, Worker, Logist, Admin |
+| GET | /cargo-items/{id}/label | Worker, Logist, Admin |
 | GET | /cargo-items/{id}/history | Client, Worker, Logist, Admin |
 | PATCH | /cargo-items/{id}/status | Worker, Logist, Admin |
 | PATCH | /cargo-items/{id}/assign-zone | Logist, Admin |
@@ -95,4 +95,3 @@ All paths are relative to `/api/v1`.
 | PATCH | /users/{id} | Admin |
 | PATCH | /users/{id}/block | Admin |
 | DELETE | /users/{id} | Admin |
-

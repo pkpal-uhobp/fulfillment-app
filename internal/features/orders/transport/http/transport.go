@@ -22,28 +22,24 @@ type OrdersService interface {
 		actorRole string,
 		input orders_service.CreateOrderInput,
 	) (orders_service.OrderDTO, error)
-
 	ListOrders(
 		ctx context.Context,
 		actorID int64,
 		actorRole string,
 		filter orders_service.OrderFilter,
 	) ([]orders_service.OrderDTO, error)
-
 	GetOrder(
 		ctx context.Context,
 		orderID int64,
 		actorID int64,
 		actorRole string,
 	) (orders_service.OrderDTO, error)
-
 	GetOrderHistory(
 		ctx context.Context,
 		orderID int64,
 		actorID int64,
 		actorRole string,
 	) ([]orders_service.OrderStatusHistoryDTO, error)
-
 	CancelOrder(
 		ctx context.Context,
 		orderID int64,
@@ -51,7 +47,6 @@ type OrdersService interface {
 		actorRole string,
 		input orders_service.CancelOrderInput,
 	) error
-
 	UpdateOrderStatus(
 		ctx context.Context,
 		orderID int64,
@@ -71,45 +66,36 @@ func NewOrdersHTTPHandler(
 }
 
 func (h *OrdersHTTPHandler) Routes() []core_http_server.Route {
+	clientLogistAdminRoles := []string{
+		core_domain.RoleClient.String(),
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+
 	return []core_http_server.Route{
 		core_http_server.NewRoute(
 			http.MethodPost,
 			"/orders",
 			h.CreateOrder,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			[]string{core_domain.RoleClient.String()},
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/orders",
 			h.ListOrders,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/orders/{id}",
 			h.GetOrder,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/orders/{id}/history",
 			h.GetOrderHistory,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
