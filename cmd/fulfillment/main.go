@@ -31,6 +31,9 @@ import (
 	shipments_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/repository/postgres"
 	shipments_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/service"
 	shipments_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/transport/http"
+	users_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/users/repository/postgres"
+	users_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/users/service"
+	users_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/users/transport/http"
 	warehouses_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/repository/postgres"
 	warehouses_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/service"
 	warehouses_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/transport/http"
@@ -101,18 +104,6 @@ func main() {
 	)
 	v1.RegisterRoutes(warehousesHTTPHandler.Routes()...)
 
-	ordersRepo := orders_postgres.NewOrdersRepository(
-		txManager,
-	)
-	ordersService := orders_service.NewOrdersService(
-		ordersRepo,
-	)
-	ordersHTTPHandler := orders_http.NewOrdersHTTPHandler(
-		log,
-		ordersService,
-	)
-	v1.RegisterRoutes(ordersHTTPHandler.Routes()...)
-
 	pickupCalendarRepo := pickupcalendar_postgres.NewPickupCalendarRepository(
 		txManager,
 	)
@@ -124,6 +115,31 @@ func main() {
 		pickupCalendarService,
 	)
 	v1.RegisterRoutes(pickupCalendarHTTPHandler.Routes()...)
+
+	ordersRepo := orders_postgres.NewOrdersRepository(
+		txManager,
+	)
+	ordersService := orders_service.NewOrdersServiceWithPickupCalendar(
+		ordersRepo,
+		pickupCalendarService,
+	)
+	ordersHTTPHandler := orders_http.NewOrdersHTTPHandler(
+		log,
+		ordersService,
+	)
+	v1.RegisterRoutes(ordersHTTPHandler.Routes()...)
+
+	cargoItemsRepo := cargoitems_postgres.NewCargoItemsRepository(
+		txManager,
+	)
+	cargoItemsService := cargoitems_service.NewCargoItemsService(
+		cargoItemsRepo,
+	)
+	cargoItemsHTTPHandler := cargoitems_http.NewCargoItemsHTTPHandler(
+		log,
+		cargoItemsService,
+	)
+	v1.RegisterRoutes(cargoItemsHTTPHandler.Routes()...)
 
 	shipmentsRepo := shipments_postgres.NewShipmentsRepository(
 		txManager,
@@ -137,17 +153,17 @@ func main() {
 	)
 	v1.RegisterRoutes(shipmentsHTTPHandler.Routes()...)
 
-	cargoItemsRepo := cargoitems_postgres.NewCargoItemsRepository(
+	usersRepo := users_postgres.NewUsersRepository(
 		txManager,
 	)
-	cargoItemsService := cargoitems_service.NewCargoItemsService(
-		cargoItemsRepo,
+	usersService := users_service.NewUsersService(
+		usersRepo,
 	)
-	cargoItemsHTTPHandler := cargoitems_http.NewCargoItemsHTTPHandler(
+	usersHTTPHandler := users_http.NewUsersHTTPHandler(
 		log,
-		cargoItemsService,
+		usersService,
 	)
-	v1.RegisterRoutes(cargoItemsHTTPHandler.Routes()...)
+	v1.RegisterRoutes(usersHTTPHandler.Routes()...)
 
 	httpConfig := core_http_server.NewConfigMust()
 	httpServer := core_http_server.NewHTTPServer(
