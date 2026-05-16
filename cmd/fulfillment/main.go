@@ -28,6 +28,9 @@ import (
 	pickupcalendar_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/pickupcalendar/repository/postgres"
 	pickupcalendar_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/pickupcalendar/service"
 	pickupcalendar_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/pickupcalendar/transport/http"
+	shipments_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/repository/postgres"
+	shipments_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/service"
+	shipments_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/shipments/transport/http"
 	warehouses_postgres "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/repository/postgres"
 	warehouses_service "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/service"
 	warehouses_http "github.com/pkpal-uhobp/fulfillment-app/internal/features/warehouses/transport/http"
@@ -121,6 +124,18 @@ func main() {
 		pickupCalendarService,
 	)
 	v1.RegisterRoutes(pickupCalendarHTTPHandler.Routes()...)
+
+	shipmentsRepo := shipments_postgres.NewShipmentsRepository(
+		txManager,
+	)
+	shipmentsService := shipments_service.NewShipmentsService(
+		shipmentsRepo,
+	)
+	shipmentsHTTPHandler := shipments_http.NewShipmentsHTTPHandler(
+		log,
+		shipmentsService,
+	)
+	v1.RegisterRoutes(shipmentsHTTPHandler.Routes()...)
 
 	cargoItemsRepo := cargoitems_postgres.NewCargoItemsRepository(
 		txManager,
