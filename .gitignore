@@ -16,6 +16,9 @@ bin/
 
 /pkg/
 /out/pgdata
+out/logs/
+logs/
+*.log
 
 .idea/
 *.iml
@@ -23,3 +26,13 @@ bin/
 .DS_Store
 Thumbs.db
 tree.txt
+
+frontend/node_modules/
+
+
+frontend/dist/
+frontend/.vite/
+
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
