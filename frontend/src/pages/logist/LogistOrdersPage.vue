@@ -3,20 +3,14 @@
     <div v-if="error" class="alert">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
 
-    <div class="toolbar">
+    <div class="toolbar panel">
       <div>
         <p>Заявки</p>
         <h2>Управление статусами</h2>
       </div>
       <div class="filters">
-        <select v-model="filters.status" @change="loadOrders">
-          <option v-for="option in orderStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-        </select>
-        <select v-model="filters.handoverType" @change="loadOrders">
-          <option value="">Все способы передачи</option>
-          <option value="self_delivery">Сдача на склад</option>
-          <option value="pickup">Забор с адреса</option>
-        </select>
+        <BaseSelect v-model="filters.status" :options="orderStatusOptions" placeholder="Все статусы" @change="loadOrders" />
+        <BaseSelect v-model="filters.handoverType" :options="handoverOptions" placeholder="Все способы передачи" @change="loadOrders" />
         <button type="button" @click="loadOrders">Обновить</button>
       </div>
     </div>
@@ -40,15 +34,15 @@
 
         <div class="action-box">
           <label>
-            Новый статус
-            <select v-model="forms[order.id].status">
-              <option v-for="option in orderStatusOptions.filter((item) => item.value)" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
+            <span>Новый статус</span>
+            <BaseSelect
+              v-model="forms[order.id].status"
+              :options="orderStatusOptions.filter((item) => item.value)"
+              placeholder="Выберите статус"
+            />
           </label>
           <label>
-            Комментарий
+            <span>Комментарий</span>
             <input v-model.trim="forms[order.id].comment" placeholder="Например: принято логистом" />
           </label>
           <button type="button" :disabled="loadingId === order.id" @click="updateStatus(order)">
@@ -77,6 +71,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import BaseSelect from '@/shared/ui/BaseSelect.vue'
 import { apiFetch } from '@/shared/api/http'
 import {
   formatDate,
@@ -86,8 +81,15 @@ import {
   orderStatusLabels,
   orderStatusOptions,
   unwrapList,
+  unwrapOne,
   warehouseName,
 } from './logistUtils'
+
+const handoverOptions = [
+  { value: '', label: 'Все способы передачи' },
+  { value: 'self_delivery', label: 'Сдача на склад' },
+  { value: 'pickup', label: 'Забор с адреса' },
+]
 
 const orders = ref([])
 const warehouses = ref([])
@@ -137,28 +139,24 @@ async function loadOrders() {
 }
 
 async function updateStatus(order) {
+  loadingId.value = order.id
   error.value = ''
   success.value = ''
-  loadingId.value = order.id
+  const form = forms[order.id]
   try {
-    const form = forms[order.id]
     const payload = await apiFetch(`/orders/${order.id}/status`, {
       auth: true,
       method: 'PATCH',
-      body: {
-        status: form.status,
-        comment: form.comment || undefined,
-      },
+      body: { status: form.status, comment: form.comment || undefined },
     })
-    const updated = payload.order || payload.data || payload
+    const updated = unwrapOne(payload, 'order') || { ...order, status: form.status }
     const index = orders.value.findIndex((item) => item.id === order.id)
     if (index !== -1) orders.value[index] = updated
-    ensureForm(updated)
-    forms[order.id].comment = ''
-    success.value = `Статус заявки #${order.id} обновлён`
+    forms[order.id] = { status: updated.status, comment: '' }
     delete history[order.id]
+    success.value = `Статус заявки #${order.id} обновлён`
   } catch (err) {
-    error.value = err.message || 'Не удалось обновить статус заявки'
+    error.value = err.message || 'Не удалось обновить статус'
   } finally {
     loadingId.value = null
   }
@@ -170,7 +168,7 @@ async function onHistoryToggle(event, orderId) {
   try {
     const payload = await apiFetch(`/orders/${orderId}/history`, { auth: true })
     history[orderId] = unwrapList(payload, 'history')
-  } catch (err) {
+  } catch {
     history[orderId] = []
   } finally {
     historyLoadingId.value = null
@@ -184,34 +182,42 @@ onMounted(async () => {
 
 <style scoped>
 .page { display:grid; gap:20px; }
-.alert, .success { padding:16px 18px; border-radius:18px; font-weight:900; }
+.alert, .success { padding:16px 18px; border-radius:18px; font-weight:950; }
 .alert { background:#fee2e2; color:#991b1b; }
 .success { background:#d1fae5; color:#065f46; }
-.toolbar { display:flex; justify-content:space-between; gap:18px; align-items:end; padding:26px; border-radius:32px; background:white; box-shadow:0 18px 42px rgba(7,16,31,.08); }
-.toolbar p { margin:0 0 8px; color:#ff3f4d; text-transform:uppercase; letter-spacing:.22em; font-weight:900; font-size:12px; }
+.panel, .order-card, .empty { background:white; border-radius:32px; padding:24px; box-shadow:0 18px 42px rgba(7,16,31,.08); }
+.toolbar { display:flex; align-items:end; justify-content:space-between; gap:18px; }
+.toolbar p { margin:0 0 8px; color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:950; }
 .toolbar h2 { margin:0; font-size:34px; letter-spacing:-.04em; }
-.filters { display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; }
-select, input { height:48px; border:1px solid #dbe3ef; border-radius:16px; padding:0 14px; background:#f6f8fb; font-weight:800; color:#07101f; }
-button { height:48px; border:0; border-radius:16px; padding:0 18px; font-weight:900; cursor:pointer; background:#07101f; color:white; }
-button:disabled { opacity:.55; cursor:wait; }
+.filters { display:grid; grid-template-columns: minmax(180px, 260px) minmax(180px, 260px) auto; gap:12px; align-items:end; }
+.filters > button { min-height:58px; border:0; border-radius:18px; padding:0 20px; background:#07101f; color:white; font-weight:950; cursor:pointer; font-family:inherit; }
 .orders-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:20px; }
-.order-card { display:flex; flex-direction:column; gap:18px; padding:24px; border-radius:32px; background:white; box-shadow:0 18px 42px rgba(7,16,31,.08); }
+.order-card { display:flex; flex-direction:column; gap:18px; }
 .card-top { display:flex; justify-content:space-between; gap:14px; align-items:start; }
-.card-top span { color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:900; }
+.card-top span, .history summary, .action-box label > span { color:#94a3b8; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:950; }
 .card-top h3 { margin:8px 0 0; font-size:28px; letter-spacing:-.04em; }
-.card-top em { font-style:normal; padding:10px 12px; border-radius:999px; background:#ffe6e8; color:#ff3f4d; font-weight:900; white-space:nowrap; }
-.meta-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
-.meta-grid div { padding:16px; border-radius:20px; background:#f6f8fb; display:grid; gap:5px; }
-small, .muted { color:#6b7b91; font-weight:800; }
-.meta-grid b { word-break: break-word; }
-.action-box { margin-top:auto; display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:16px; border-radius:24px; background:#f6f8fb; }
-.action-box label { display:grid; gap:8px; font-size:12px; text-transform:uppercase; letter-spacing:.14em; color:#8b9ab0; font-weight:900; }
-.action-box button { grid-column:1 / -1; background:#ff3f4d; }
-.history { border-top:1px solid #edf1f7; padding-top:14px; }
-summary { cursor:pointer; font-weight:900; color:#07101f; }
-.history-list { display:grid; gap:10px; margin-top:12px; }
-.history-item { padding:14px; border-radius:18px; background:#f6f8fb; display:grid; gap:4px; }
-.empty { padding:26px; border-radius:26px; background:white; font-weight:900; color:#63738a; }
-@media (max-width:1100px) { .orders-grid { grid-template-columns: 1fr; } .toolbar { flex-direction:column; align-items:stretch; } .filters { justify-content:stretch; } .filters > * { flex:1; } }
-@media (max-width:640px) { .meta-grid, .action-box { grid-template-columns:1fr; } .card-top { flex-direction:column; } }
+.card-top em { display:inline-flex; align-items:center; min-height:36px; padding:0 12px; border-radius:999px; background:#ffe4e6; color:#e11d48; font-style:normal; font-weight:950; }
+.meta-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+.meta-grid div, .action-box { background:#f6f8fb; border-radius:22px; padding:16px; }
+.meta-grid small { display:block; color:#64748b; font-weight:900; margin-bottom:6px; }
+.meta-grid b { display:block; font-size:16px; }
+.action-box { display:grid; grid-template-columns: 1fr 1fr; gap:14px; align-items:end; }
+.action-box label { display:grid; gap:8px; }
+input { min-height:58px; border:1px solid #dbe3ef; border-radius:18px; padding:0 18px; background:white; color:#07101f; font-weight:950; font-family:inherit; }
+.action-box button { grid-column:1 / -1; min-height:58px; border:0; border-radius:18px; background:#ff3f4d; color:white; font-weight:950; cursor:pointer; font-family:inherit; }
+.action-box button:disabled { opacity:.55; cursor:wait; }
+.history { background:#f8fafc; border-radius:22px; padding:16px; }
+.history summary { cursor:pointer; color:#07101f; }
+.history-list { display:grid; gap:10px; margin-top:14px; }
+.history-item { display:grid; gap:4px; padding:12px; border-radius:16px; background:white; }
+.history-item span, .history-item small, .muted { color:#64748b; font-weight:800; }
+.empty { text-align:center; color:#64748b; font-weight:950; }
+@media (max-width: 1180px) {
+  .orders-grid { grid-template-columns:1fr; }
+  .toolbar { display:grid; }
+  .filters { grid-template-columns:1fr; }
+}
+@media (max-width: 680px) {
+  .meta-grid, .action-box { grid-template-columns:1fr; }
+}
 </style>

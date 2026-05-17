@@ -16,7 +16,9 @@
     "pinia": "latest",
     "vite": "latest",
     "vue": "latest",
-    "vue-router": "latest"
+    "vue-router": "latest",
+    "qrcode": "latest",
+    "jszip": "latest"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",

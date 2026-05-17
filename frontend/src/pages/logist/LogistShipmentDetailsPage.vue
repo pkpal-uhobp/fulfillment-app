@@ -27,9 +27,11 @@
         <p>Статус</p>
         <h3>Управление отправкой</h3>
         <div class="inline-form">
-          <select v-model="statusForm.status">
-            <option v-for="option in shipmentStatusOptions.filter((item) => item.value)" :key="option.value" :value="option.value">{{ option.label }}</option>
-          </select>
+          <BaseSelect
+            v-model="statusForm.status"
+            :options="shipmentStatusOptions.filter((item) => item.value)"
+            placeholder="Выберите статус"
+          />
           <button type="button" @click="updateStatus">Обновить</button>
         </div>
       </article>
@@ -43,11 +45,12 @@
         </div>
         <b>{{ shipment?.items?.length || 0 }} мест</b>
       </div>
+
       <div class="items-list">
         <div v-for="item in shipment?.items || []" :key="item.cargo_item_id" class="item-row">
           <div>
             <strong>{{ item.qr_code }}</strong>
-            <span>{{ labelFromMap(cargoStatusLabels, item.status) }} · заказ #{{ item.order_id }}</span>
+            <span>{{ labelFromMap(cargoStatusLabels, item.status) }} · заявка #{{ item.order_id }}</span>
           </div>
           <button type="button" class="ghost" @click="removeItem(item.cargo_item_id)">Убрать</button>
         </div>
@@ -60,6 +63,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import BaseSelect from '@/shared/ui/BaseSelect.vue'
 import { apiFetch } from '@/shared/api/http'
 import { cargoStatusLabels, gateName, labelFromMap, shipmentStatusLabels, shipmentStatusOptions, unwrapList, unwrapOne, warehouseName } from './logistUtils'
 
@@ -154,9 +158,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page{display:grid;gap:20px}.alert,.success{padding:16px 18px;border-radius:18px;font-weight:900}.alert{background:#fee2e2;color:#991b1b}.success{background:#d1fae5;color:#065f46}
-.hero-card,.panel{background:white;border-radius:34px;padding:26px;box-shadow:0 18px 42px rgba(7,16,31,.08)}.hero-card{display:flex;justify-content:space-between;gap:18px;align-items:center;background:#07101f;color:white}
-p{margin:0 0 8px;color:#ff9da5;text-transform:uppercase;letter-spacing:.22em;font-size:12px;font-weight:900}h2,h3{margin:0;letter-spacing:-.04em}h2{font-size:36px}h3{font-size:28px}.hero-card span{color:#b8c3d6;font-weight:800}.hero-card a{background:white;color:#07101f;border-radius:18px;padding:16px 20px;text-decoration:none;font-weight:900;white-space:nowrap}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.inline-form{display:flex;gap:12px;margin-top:16px}input,select{height:52px;min-width:0;flex:1;border:1px solid #dbe3ef;border-radius:18px;padding:0 16px;background:#f6f8fb;color:#07101f;font-weight:800}button{height:52px;border:0;border-radius:18px;padding:0 18px;background:#ff3f4d;color:white;font-weight:900;cursor:pointer}.panel small{display:block;margin-top:12px;color:#64748b;font-weight:800}.head-row,.item-row{display:flex;justify-content:space-between;gap:16px;align-items:center}.head-row{margin-bottom:18px}.head-row b{padding:10px 14px;border-radius:999px;background:#ffe6e8;color:#ff3f4d}.items-list{display:grid;gap:12px}.item-row{padding:18px;border-radius:22px;background:#f6f8fb}.item-row strong{display:block;font-size:19px}.item-row span{color:#64748b;font-weight:800}.ghost{background:#edf2f7;color:#07101f}.empty{padding:22px;border-radius:22px;background:#f6f8fb;color:#64748b;font-weight:900}
-@media(max-width:900px){.grid{grid-template-columns:1fr}.hero-card,.item-row,.head-row{flex-direction:column;align-items:stretch}.inline-form{flex-direction:column}}
+.page{display:grid;gap:20px}.alert,.success{padding:16px 18px;border-radius:18px;font-weight:950}.alert{background:#fee2e2;color:#991b1b}.success{background:#d1fae5;color:#065f46}.hero-card,.panel{background:white;border-radius:34px;padding:26px;box-shadow:0 18px 42px rgba(7,16,31,.08)}.hero-card{display:flex;justify-content:space-between;gap:18px;align-items:center;background:#07101f;color:white}p{margin:0 0 8px;color:#ff9da5;text-transform:uppercase;letter-spacing:.22em;font-size:12px;font-weight:950}h2,h3{margin:0;letter-spacing:-.04em}h2{font-size:36px}h3{font-size:28px}.hero-card span{color:#b8c3d6;font-weight:800}.hero-card a{background:white;color:#07101f;border-radius:18px;padding:16px 20px;text-decoration:none;font-weight:950;white-space:nowrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;margin-top:16px}input{height:58px;min-width:0;border:1px solid #dbe3ef;border-radius:18px;padding:0 16px;background:#f6f8fb;color:#07101f;font-weight:900;font-family:inherit}button{height:58px;border:0;border-radius:18px;padding:0 18px;background:#ff3f4d;color:white;font-weight:950;cursor:pointer;font-family:inherit}.panel small{display:block;margin-top:12px;color:#64748b;font-weight:800}.head-row,.item-row{display:flex;justify-content:space-between;gap:16px;align-items:center}.head-row{margin-bottom:18px}.head-row b{padding:10px 14px;border-radius:999px;background:#ffe6e8;color:#ff3f4d}.items-list{display:grid;gap:12px}.item-row{padding:18px;border-radius:22px;background:#f6f8fb}.item-row strong{display:block;font-size:19px}.item-row span{color:#64748b;font-weight:800}.ghost{background:#edf2f7;color:#07101f}.empty{padding:22px;border-radius:22px;background:#f6f8fb;color:#64748b;font-weight:900}@media(max-width:900px){.grid{grid-template-columns:1fr}.hero-card,.head-row,.item-row{display:grid}.inline-form{grid-template-columns:1fr}}
 </style>

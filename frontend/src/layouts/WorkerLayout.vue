@@ -1,120 +1,197 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { Boxes, Home, LogOut, Menu, PackageCheck, QrCode, UserRound, X } from '@lucide/vue'
 import { clearAuth, getCurrentUser, loadMe } from '@/shared/api/http'
 
-const router = useRouter()
 const route = useRoute()
-const user = ref(getCurrentUser())
+const router = useRouter()
 const menuOpen = ref(false)
+const user = ref(getCurrentUser())
 
 const navItems = [
-  { label: 'Главная', to: '/worker', icon: Home },
-  { label: 'QR-сканер', to: '/worker/scan', icon: QrCode },
-  { label: 'Грузовые места', to: '/worker/cargo-items', icon: Boxes },
-  { label: 'Профиль', to: '/worker/profile', icon: UserRound },
+  { to: '/worker', label: 'Сводка', icon: '▦', exact: true },
+  { to: '/worker/scan', label: 'QR-сканер', icon: '▣' },
+  { to: '/worker/cargo-items', label: 'Грузовые места', icon: '▤' },
 ]
 
-const displayName = computed(() => user.value?.full_name || user.value?.email || 'Рабочий склада')
 const initials = computed(() => {
-  const parts = displayName.value.split(' ').filter(Boolean)
-  if (!parts.length) return 'Р'
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')
+  const source = user.value?.full_name || user.value?.email || 'Рабочий склада'
+  return source.split(/\s+/).filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'РС'
 })
+const displayName = computed(() => user.value?.full_name || user.value?.email || 'Рабочий склада')
 
-function isActive(path) {
-  if (path === '/worker') return route.path === '/worker'
-  return route.path.startsWith(path)
+function isActive(item) {
+  if (item.exact) return route.path === item.to
+  return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
-async function refreshUser() {
-  try { user.value = await loadMe() } catch { user.value = getCurrentUser() }
+async function refreshMe() {
+  try {
+    user.value = await loadMe()
+  } catch {
+    user.value = getCurrentUser()
+  }
 }
-function logout() { clearAuth(); router.push('/') }
-function onAuthChanged() { user.value = getCurrentUser() }
 
-onMounted(() => { window.addEventListener('auth:changed', onAuthChanged); refreshUser() })
-onBeforeUnmount(() => window.removeEventListener('auth:changed', onAuthChanged))
+function logout() {
+  clearAuth()
+  router.push({ name: 'login' })
+}
+
+onMounted(refreshMe)
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#07101f] text-white selection:bg-[#ff4248] selection:text-white">
-    <div class="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_4%_4%,rgba(255,66,72,0.18),transparent_34%),radial-gradient(circle_at_92%_12%,rgba(0,166,214,0.22),transparent_32%),linear-gradient(135deg,#160711_0%,#07101f_52%,#073e4f_100%)]"></div>
+  <div class="worker-shell">
+    <div v-if="menuOpen" class="worker-backdrop" @click="menuOpen = false"></div>
 
-    <header class="sticky top-0 z-40 border-b border-white/10 bg-[#07101f]/92 backdrop-blur-xl">
-      <div class="mx-auto flex max-w-[1480px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <div class="flex min-w-0 items-center gap-3">
-          <RouterLink to="/worker" class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#ff4248] shadow-[0_18px_44px_rgba(255,66,72,0.28)]">
-            <PackageCheck class="h-6 w-6 text-white" />
-          </RouterLink>
-          <div class="min-w-0">
-            <div class="truncate text-lg font-black tracking-[-0.04em]">Fulfillment Transit</div>
-            <div class="text-[10px] font-black uppercase tracking-[0.4em] text-[#ff8e92]">Панель рабочего</div>
-          </div>
+    <aside class="worker-sidebar" :class="{ open: menuOpen }">
+      <RouterLink class="worker-brand" to="/worker" @click="menuOpen = false">
+        <span class="worker-logo">FT</span>
+        <span>
+          <strong>Fulfillment Transit</strong>
+          <em>панель рабочего</em>
+        </span>
+      </RouterLink>
+
+      <nav class="worker-nav" aria-label="Навигация рабочего">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="worker-nav__item"
+          :class="{ active: isActive(item) }"
+          @click="menuOpen = false"
+        >
+          <i>{{ item.icon }}</i>
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="worker-sidebar__bottom">
+        <div class="worker-user">
+          <b>{{ initials }}</b>
+          <span>
+            <strong>{{ displayName }}</strong>
+            <small>Складской работник</small>
+          </span>
         </div>
-
-        <nav class="hidden items-center gap-2 lg:flex">
-          <RouterLink
-            v-for="item in navItems"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition"
-            :class="isActive(item.to) ? 'bg-white text-[#07101f]' : 'text-white/72 hover:bg-white/10 hover:text-white'"
-          >
-            <component :is="item.icon" class="h-4 w-4" />
-            {{ item.label }}
-          </RouterLink>
-        </nav>
-
-        <div class="hidden items-center gap-3 md:flex">
-          <RouterLink to="/worker/profile" class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 transition hover:border-[#ff4248]/60 hover:bg-white/10">
-            <div class="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4248] text-sm font-black">{{ initials }}</div>
-            <div class="max-w-[190px] truncate text-sm font-black">{{ displayName }}</div>
-          </RouterLink>
-          <button class="inline-flex items-center gap-2 rounded-2xl border border-white/15 px-4 py-3 text-sm font-black text-white/80 transition hover:bg-white hover:text-[#07101f]" @click="logout">
-            Выйти <LogOut class="h-4 w-4" />
-          </button>
-        </div>
-
-        <button class="grid h-11 w-11 place-items-center rounded-2xl border border-white/15 bg-white/[0.06] lg:hidden" @click="menuOpen = true">
-          <Menu class="h-5 w-5" />
-        </button>
+        <button type="button" class="worker-logout" @click="logout">Выйти</button>
       </div>
-    </header>
+    </aside>
 
-    <Teleport to="body">
-      <div v-if="menuOpen" class="fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-sm lg:hidden" @click.self="menuOpen = false">
-        <div class="ml-auto flex h-full max-w-sm flex-col rounded-[2rem] border border-white/10 bg-[#07101f] p-5 text-white shadow-2xl">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="text-lg font-black">Fulfillment Transit</div>
-              <div class="text-[10px] font-black uppercase tracking-[0.35em] text-[#ff8e92]">Рабочий</div>
-            </div>
-            <button class="grid h-11 w-11 place-items-center rounded-2xl bg-white/10" @click="menuOpen = false"><X class="h-5 w-5" /></button>
-          </div>
-          <nav class="mt-6 grid gap-2">
-            <RouterLink
-              v-for="item in navItems"
-              :key="item.to"
-              :to="item.to"
-              class="flex items-center gap-3 rounded-2xl px-4 py-4 font-black transition"
-              :class="isActive(item.to) ? 'bg-white text-[#07101f]' : 'bg-white/[0.06] text-white/75'"
-              @click="menuOpen = false"
-            >
-              <component :is="item.icon" class="h-5 w-5" />
-              {{ item.label }}
-            </RouterLink>
-          </nav>
-          <button class="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-[#ff4248] px-5 py-4 font-black text-white" @click="logout">
-            Выйти <LogOut class="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-    </Teleport>
-
-    <main class="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <main class="worker-main">
+      <header class="worker-mobile-head">
+        <button type="button" @click="menuOpen = true">☰</button>
+        <strong>Fulfillment Transit</strong>
+        <span>{{ initials }}</span>
+      </header>
       <RouterView />
     </main>
   </div>
 </template>
+
+<style scoped>
+.worker-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  background: #edf3f9;
+  color: #061126;
+}
+.worker-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 28px 24px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 63, 77, .18), transparent 26%),
+    linear-gradient(180deg, #071222 0%, #081525 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  box-shadow: 20px 0 70px rgba(5, 11, 26, .25);
+  z-index: 50;
+}
+.worker-brand {
+  color: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.worker-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: #ff3f4d;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -.03em;
+  box-shadow: 0 20px 46px rgba(255, 63, 77, .34);
+}
+.worker-brand strong { display: block; font-size: 20px; font-weight: 950; letter-spacing: -.02em; }
+.worker-brand em { display: block; margin-top: 6px; color: #ff9ca5; font-style: normal; font-size: 12px; font-weight: 950; letter-spacing: .22em; text-transform: uppercase; }
+.worker-nav { display: grid; gap: 12px; }
+.worker-nav__item {
+  position: relative;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 0 18px;
+  border-radius: 0 22px 22px 0;
+  color: #aeb9c8;
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 950;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+  outline: none;
+}
+.worker-nav__item::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 12px;
+  bottom: 12px;
+  width: 5px;
+  border-radius: 999px;
+  background: transparent;
+}
+.worker-nav__item:hover { color: #fff; background: rgba(255,255,255,.06); transform: translateX(2px); }
+.worker-nav__item.active { color: #fff; background: #202b3d; box-shadow: none; }
+.worker-nav__item.active::before { background: #ff3f4d; box-shadow: 0 0 0 5px rgba(255, 63, 77, .12); }
+.worker-nav__item i { width: 24px; text-align: center; font-style: normal; color: inherit; }
+.worker-sidebar__bottom { margin-top: auto; display: grid; gap: 14px; }
+.worker-user {
+  min-height: 78px;
+  padding: 12px 14px;
+  border-radius: 24px;
+  background: #202b3d;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.worker-user b { width: 50px; height: 50px; border-radius: 17px; background: rgba(255, 63, 77, .18); color: #ff8190; display: grid; place-items: center; font-weight: 950; }
+.worker-user strong, .worker-user small { display: block; }
+.worker-user strong { font-weight: 950; line-height: 1.2; }
+.worker-user small { margin-top: 4px; color: #9aa8bc; font-weight: 800; }
+.worker-logout { min-height: 56px; border: 0; border-radius: 20px; background: #202b3d; color: #fff; font-size: 17px; font-weight: 950; cursor: pointer; }
+.worker-logout:hover { background: #ff3f4d; }
+.worker-main { min-width: 0; padding: 34px; }
+.worker-mobile-head, .worker-backdrop { display: none; }
+.worker-mobile-head span { width: 46px; height: 46px; border-radius: 15px; background: #ff3f4d; display: grid; place-items: center; font-weight: 950; }
+@media (max-width: 980px) {
+  .worker-shell { display: block; }
+  .worker-sidebar { position: fixed; inset: 0 auto 0 0; width: min(320px, 88vw); transform: translateX(-105%); transition: transform .22s ease; }
+  .worker-sidebar.open { transform: translateX(0); }
+  .worker-backdrop { display: block; position: fixed; inset: 0; background: rgba(4, 10, 24, .58); z-index: 40; }
+  .worker-main { padding: 18px; }
+  .worker-mobile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 12px; border-radius: 22px; background: #071222; color: #fff; }
+  .worker-mobile-head button { width: 46px; height: 46px; border: 0; border-radius: 15px; background: #ff3f4d; color: #fff; display: grid; place-items: center; font-weight: 950; }
+}
+</style>

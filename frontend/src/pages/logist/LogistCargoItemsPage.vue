@@ -3,7 +3,7 @@
     <div v-if="error" class="alert">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
 
-    <div class="toolbar">
+    <div class="toolbar panel">
       <div>
         <p>QR-контроль</p>
         <h2>Грузовые места</h2>
@@ -27,18 +27,10 @@
       </div>
     </div>
 
-    <div class="filters">
-      <select v-model="filters.status" @change="loadCargoItems">
-        <option v-for="option in cargoStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-      <select v-model="filters.zoneId" @change="loadCargoItems">
-        <option value="">Все зоны</option>
-        <option v-for="zone in zones" :key="zone.id" :value="zone.id">{{ zone.name }}</option>
-      </select>
-      <select v-model="filters.gateId" @change="loadCargoItems">
-        <option value="">Все гейты</option>
-        <option v-for="gate in gates" :key="gate.id" :value="gate.id">{{ gate.name }}</option>
-      </select>
+    <div class="filters panel">
+      <BaseSelect v-model="filters.status" :options="cargoStatusOptions" placeholder="Все статусы" @change="loadCargoItems" />
+      <BaseSelect v-model="filters.zoneId" :options="zoneOptions" placeholder="Все зоны" @change="loadCargoItems" />
+      <BaseSelect v-model="filters.gateId" :options="gateOptions" placeholder="Все гейты" @change="loadCargoItems" />
       <button type="button" @click="loadCargoItems">Обновить</button>
     </div>
 
@@ -63,27 +55,23 @@
 
         <div class="action-box">
           <label>
-            Статус
-            <select v-model="forms[cargo.id].status">
-              <option v-for="option in cargoStatusOptions.filter((item) => item.value)" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
+            <span>Статус</span>
+            <BaseSelect
+              v-model="forms[cargo.id].status"
+              :options="cargoStatusOptions.filter((item) => item.value)"
+              placeholder="Выберите статус"
+            />
           </label>
           <label>
-            Зона
-            <select v-model="forms[cargo.id].storageZoneId">
-              <option value="">Не назначать</option>
-              <option v-for="zone in zones" :key="zone.id" :value="zone.id">{{ zone.name }}</option>
-            </select>
+            <span>Зона</span>
+            <BaseSelect v-model="forms[cargo.id].storageZoneId" :options="zoneAssignOptions" placeholder="Не назначать" />
           </label>
           <label>
-            Гейт
-            <select v-model="forms[cargo.id].gateId">
-              <option value="">Не назначать</option>
-              <option v-for="gate in gates" :key="gate.id" :value="gate.id">{{ gate.name }}</option>
-            </select>
+            <span>Гейт</span>
+            <BaseSelect v-model="forms[cargo.id].gateId" :options="gateAssignOptions" placeholder="Не назначать" />
           </label>
           <label>
-            Комментарий
+            <span>Комментарий</span>
             <input v-model.trim="forms[cargo.id].comment" placeholder="Комментарий операции" />
           </label>
           <button type="button" :disabled="loadingId === cargo.id" @click="applyCargoChanges(cargo)">
@@ -111,7 +99,8 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import BaseSelect from '@/shared/ui/BaseSelect.vue'
 import { apiFetch } from '@/shared/api/http'
 import {
   cargoStatusLabels,
@@ -137,12 +126,17 @@ const success = ref('')
 const loadingId = ref(null)
 const historyLoadingId = ref(null)
 
+const zoneOptions = computed(() => [{ value: '', label: 'Все зоны' }, ...zones.value.map((zone) => ({ value: String(zone.id), label: zone.name, description: zone.warehouse_name || '' }))])
+const gateOptions = computed(() => [{ value: '', label: 'Все гейты' }, ...gates.value.map((gate) => ({ value: String(gate.id), label: gate.name, description: gate.warehouse_name || '' }))])
+const zoneAssignOptions = computed(() => [{ value: '', label: 'Не назначать' }, ...zones.value.map((zone) => ({ value: String(zone.id), label: zone.name, description: zone.warehouse_name || '' }))])
+const gateAssignOptions = computed(() => [{ value: '', label: 'Не назначать' }, ...gates.value.map((gate) => ({ value: String(gate.id), label: gate.name, description: gate.warehouse_name || '' }))])
+
 function ensureForm(cargo) {
   if (!forms[cargo.id]) {
     forms[cargo.id] = {
       status: cargo.status || 'accepted',
-      storageZoneId: cargo.storage_zone_id || '',
-      gateId: cargo.gate_id || '',
+      storageZoneId: cargo.storage_zone_id ? String(cargo.storage_zone_id) : '',
+      gateId: cargo.gate_id ? String(cargo.gate_id) : '',
       comment: '',
     }
   }
@@ -205,7 +199,7 @@ async function applyCargoChanges(cargo) {
         method: 'PATCH',
         body: { storage_zone_id: Number(form.storageZoneId), comment: form.comment || undefined },
       })
-      updated = unwrapOne(payload, 'cargo_item')
+      updated = unwrapOne(payload, 'cargo_item') || updated
     }
     if (form.gateId && Number(form.gateId) !== Number(updated.gate_id || 0)) {
       const payload = await apiFetch(`/cargo-items/${cargo.id}/assign-gate`, {
@@ -213,7 +207,7 @@ async function applyCargoChanges(cargo) {
         method: 'PATCH',
         body: { gate_id: Number(form.gateId), comment: form.comment || undefined },
       })
-      updated = unwrapOne(payload, 'cargo_item')
+      updated = unwrapOne(payload, 'cargo_item') || updated
     }
     if (form.status && form.status !== updated.status) {
       const payload = await apiFetch(`/cargo-items/${cargo.id}/status`, {
@@ -221,14 +215,14 @@ async function applyCargoChanges(cargo) {
         method: 'PATCH',
         body: { status: form.status, comment: form.comment || undefined },
       })
-      updated = unwrapOne(payload, 'cargo_item')
+      updated = unwrapOne(payload, 'cargo_item') || { ...updated, status: form.status }
     }
     const index = cargoItems.value.findIndex((item) => item.id === cargo.id)
     if (index !== -1) cargoItems.value[index] = updated
     forms[cargo.id] = {
       status: updated.status,
-      storageZoneId: updated.storage_zone_id || '',
-      gateId: updated.gate_id || '',
+      storageZoneId: updated.storage_zone_id ? String(updated.storage_zone_id) : '',
+      gateId: updated.gate_id ? String(updated.gate_id) : '',
       comment: '',
     }
     success.value = `Груз ${updated.qr_code} обновлён`
@@ -260,39 +254,50 @@ onMounted(async () => {
 
 <style scoped>
 .page { display:grid; gap:20px; }
-.alert, .success { padding:16px 18px; border-radius:18px; font-weight:900; }
+.alert, .success { padding:16px 18px; border-radius:18px; font-weight:950; }
 .alert { background:#fee2e2; color:#991b1b; }
 .success { background:#d1fae5; color:#065f46; }
-.toolbar, .filters, .scan-result { background:white; border-radius:32px; padding:24px; box-shadow:0 18px 42px rgba(7,16,31,.08); }
+.panel, .scan-result, .cargo-card, .empty { background:white; border-radius:32px; padding:24px; box-shadow:0 18px 42px rgba(7,16,31,.08); }
 .toolbar { display:flex; align-items:end; justify-content:space-between; gap:18px; }
-.toolbar p { margin:0 0 8px; color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:900; }
+.toolbar p, .scan-result p { margin:0 0 8px; color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:950; }
 .toolbar h2 { margin:0; font-size:34px; letter-spacing:-.04em; }
-.scan-box, .filters { display:flex; gap:12px; flex-wrap:wrap; }
-input, select { height:48px; border:1px solid #dbe3ef; border-radius:16px; padding:0 14px; background:#f6f8fb; color:#07101f; font-weight:800; }
-button { height:48px; border:0; border-radius:16px; padding:0 18px; background:#ff3f4d; color:white; font-weight:900; cursor:pointer; }
+.scan-box, .filters { display:grid; grid-template-columns: minmax(220px, 1fr) auto; gap:12px; align-items:end; }
+.filters { grid-template-columns: repeat(3, minmax(180px, 1fr)) auto; }
+input { min-height:58px; border:1px solid #dbe3ef; border-radius:18px; padding:0 18px; background:#f6f8fb; color:#07101f; font-weight:950; font-family:inherit; }
+button { min-height:58px; border:0; border-radius:18px; padding:0 20px; background:#ff3f4d; color:white; font-weight:950; cursor:pointer; font-family:inherit; }
 button:disabled { opacity:.55; cursor:wait; }
+.filters button { background:#07101f; }
 .scan-result { display:flex; justify-content:space-between; gap:18px; background:#07101f; color:white; }
-.scan-result p { margin:0 0 8px; color:#ff9da5; letter-spacing:.22em; text-transform:uppercase; font-weight:900; font-size:12px; }
 .scan-result h3 { margin:0 0 10px; font-size:30px; }
-.scan-result span { color:#7dd3fc; font-weight:900; }
+.scan-result span { color:#7dd3fc; font-weight:950; }
 .result-meta { display:grid; gap:8px; text-align:right; }
 .cargo-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:20px; }
-.cargo-card { display:flex; flex-direction:column; gap:18px; padding:24px; border-radius:32px; background:white; box-shadow:0 18px 42px rgba(7,16,31,.08); }
+.cargo-card { display:flex; flex-direction:column; gap:18px; }
 .card-top { display:flex; justify-content:space-between; gap:14px; align-items:start; }
-.card-top span { color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:900; }
-.card-top h3 { margin:8px 0 0; font-size:28px; letter-spacing:-.04em; }
-.card-top em { font-style:normal; padding:10px 12px; border-radius:999px; background:#ffe6e8; color:#ff3f4d; font-weight:900; white-space:nowrap; }
-.meta-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.meta-grid div { padding:16px; border-radius:20px; background:#f6f8fb; display:grid; gap:5px; }
-small, .muted { color:#6b7b91; font-weight:800; }
-.action-box { margin-top:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px; border-radius:24px; background:#f6f8fb; }
-.action-box label { display:grid; gap:8px; font-size:12px; text-transform:uppercase; letter-spacing:.14em; color:#8b9ab0; font-weight:900; }
+.card-top span, .history summary, .action-box label > span { color:#94a3b8; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:950; }
+.card-top h3 { margin:8px 0 0; font-size:26px; letter-spacing:-.04em; overflow-wrap:anywhere; }
+.card-top em { display:inline-flex; align-items:center; min-height:36px; padding:0 12px; border-radius:999px; background:#eef2ff; color:#3730a3; font-style:normal; font-weight:950; }
+.meta-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+.meta-grid div, .action-box { background:#f6f8fb; border-radius:22px; padding:16px; }
+.meta-grid small { display:block; color:#64748b; font-weight:900; margin-bottom:6px; }
+.meta-grid b { display:block; font-size:16px; overflow-wrap:anywhere; }
+.action-box { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:14px; align-items:end; }
+.action-box label { display:grid; gap:8px; }
 .action-box button { grid-column:1 / -1; }
-.history { border-top:1px solid #edf1f7; padding-top:14px; }
-summary { cursor:pointer; font-weight:900; }
-.history-list { display:grid; gap:10px; margin-top:12px; }
-.history-item { display:grid; gap:4px; padding:14px; border-radius:18px; background:#f6f8fb; }
-.empty { padding:26px; border-radius:26px; background:white; font-weight:900; color:#63738a; }
-@media (max-width:1100px) { .cargo-grid { grid-template-columns:1fr; } .toolbar, .scan-result { flex-direction:column; align-items:stretch; } }
-@media (max-width:640px) { .meta-grid, .action-box { grid-template-columns:1fr; } .card-top { flex-direction:column; } }
+.history { background:#f8fafc; border-radius:22px; padding:16px; }
+.history summary { cursor:pointer; color:#07101f; }
+.history-list { display:grid; gap:10px; margin-top:14px; }
+.history-item { display:grid; gap:4px; padding:12px; border-radius:16px; background:white; }
+.history-item span, .history-item small, .muted { color:#64748b; font-weight:800; }
+.empty { text-align:center; color:#64748b; font-weight:950; }
+@media (max-width: 1180px) {
+  .cargo-grid { grid-template-columns:1fr; }
+  .toolbar { display:grid; }
+  .filters { grid-template-columns:1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .scan-box, .filters, .action-box, .meta-grid { grid-template-columns:1fr; }
+  .scan-result { display:grid; }
+  .result-meta { text-align:left; }
+}
 </style>
