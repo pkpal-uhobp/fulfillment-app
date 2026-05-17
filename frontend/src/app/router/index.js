@@ -28,7 +28,6 @@ import WorkerDashboardPage from '@/pages/worker/WorkerDashboardPage.vue'
 import WorkerOrdersPage from '@/pages/worker/WorkerOrdersPage.vue'
 import WorkerScanPage from '@/pages/worker/WorkerScanPage.vue'
 import WorkerCargoItemsPage from '@/pages/worker/WorkerCargoItemsPage.vue'
-import WorkerProfilePage from '@/pages/worker/WorkerProfilePage.vue'
 
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import AdminDashboardPage from '@/pages/admin/AdminDashboardPage.vue'
@@ -96,7 +95,7 @@ const routes = [
       { path: 'orders', name: 'worker-orders', component: WorkerOrdersPage },
       { path: 'scan', name: 'worker-scan', component: WorkerScanPage },
       { path: 'cargo-items', name: 'worker-cargo-items', component: WorkerCargoItemsPage },
-      { path: 'profile', name: 'worker-profile', component: WorkerProfilePage },
+      { path: 'profile', name: 'worker-profile', redirect: '/worker' },
     ],
   },
   {
@@ -147,10 +146,7 @@ function homeForRole(role) {
 
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !getAccessToken()) {
-    return {
-      name: 'login',
-      query: { redirect: to.fullPath },
-    }
+    return { name: 'landing' }
   }
 
   const allowed = to.meta.roles

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { clearAuth, getCurrentUser, loadMe } from '@/shared/api/http'
+import { clearAuth, getCurrentUser } from '@/shared/api/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,7 +13,6 @@ const navItems = [
   { to: '/worker/orders', label: 'Заявки', icon: '▥' },
   { to: '/worker/scan', label: 'QR-сканер', icon: '▣' },
   { to: '/worker/cargo-items', label: 'Грузовые места', icon: '▤' },
-  { to: '/worker/profile', label: 'Профиль', icon: '●' },
 ]
 
 const initials = computed(() => {
@@ -27,26 +26,19 @@ const initials = computed(() => {
     .slice(0, 2)
     .toUpperCase() || 'РС'
 })
-
-const displayName = computed(() => user.value?.full_name || user.value?.email || 'Рабочий склада')
-
 function isActive(item) {
   if (item.exact) return route.path === item.to
 
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
-async function refreshMe() {
-  try {
-    user.value = await loadMe()
-  } catch {
-    user.value = getCurrentUser()
-  }
+function refreshMe() {
+  user.value = getCurrentUser()
 }
 
 function logout() {
   clearAuth()
-  router.push({ name: 'login' })
+  router.push({ name: 'landing' })
 }
 
 onMounted(refreshMe)
@@ -80,14 +72,6 @@ onMounted(refreshMe)
       </nav>
 
       <div class="worker-sidebar__bottom">
-        <div class="worker-user">
-          <b>{{ initials }}</b>
-          <span>
-            <strong>{{ displayName }}</strong>
-            <small>Складской работник</small>
-          </span>
-        </div>
-
         <button type="button" class="worker-logout" @click="logout">Выйти</button>
       </div>
     </aside>
@@ -230,44 +214,6 @@ onMounted(refreshMe)
   gap: 14px;
 }
 
-.worker-user {
-  min-height: 78px;
-  padding: 12px 14px;
-  border-radius: 24px;
-  background: #202b3d;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.worker-user b {
-  width: 50px;
-  height: 50px;
-  border-radius: 17px;
-  background: rgba(255, 63, 77, .18);
-  color: #ff8190;
-  display: grid;
-  place-items: center;
-  font-weight: 950;
-}
-
-.worker-user strong,
-.worker-user small {
-  display: block;
-}
-
-.worker-user strong {
-  font-weight: 950;
-  line-height: 1.2;
-}
-
-.worker-user small {
-  margin-top: 4px;
-  color: #9aa8bc;
-  font-weight: 800;
-}
-
 .worker-logout {
   min-height: 56px;
   border: 0;
@@ -278,7 +224,6 @@ onMounted(refreshMe)
   font-weight: 950;
   cursor: pointer;
 }
-
 .worker-logout:hover {
   background: #ff3f4d;
 }

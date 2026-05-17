@@ -8,20 +8,40 @@
         <p>Заявки</p>
         <h2>Управление статусами</h2>
       </div>
-      <div class="filters">
-        <BaseSelect v-model="filters.status" :options="orderStatusOptions" placeholder="Все статусы" @change="loadOrders" />
-        <BaseSelect v-model="filters.handoverType" :options="handoverOptions" placeholder="Все способы передачи" @change="loadOrders" />
+
+      <div class="filters filters--orders">
+        <BaseSelect
+          v-model="filters.status"
+          :options="orderStatusOptions"
+          placeholder="Все статусы"
+          @change="loadOrders"
+        />
+
+        <BaseSelect
+          v-model="filters.handoverType"
+          :options="handoverOptions"
+          placeholder="Все способы передачи"
+          @change="loadOrders"
+        />
+
+        <BaseSelect
+          v-model="filters.warehouseId"
+          :options="warehouseOptions"
+          placeholder="Все склады"
+        />
+
         <button type="button" @click="loadOrders">Обновить</button>
       </div>
     </div>
 
     <div class="orders-grid">
-      <article v-for="order in orders" :key="order.id" class="order-card">
+      <article v-for="order in filteredOrders" :key="order.id" class="order-card">
         <div class="card-top">
           <div>
             <span>Заявка #{{ order.id }}</span>
             <h3>{{ labelFromMap(orderStatusLabels, order.status) }}</h3>
           </div>
+
           <em>{{ handoverLabels[order.handover_type] || order.handover_type }}</em>
         </div>
 
@@ -41,10 +61,12 @@
               placeholder="Выберите статус"
             />
           </label>
+
           <label>
             <span>Комментарий</span>
             <input v-model.trim="forms[order.id].comment" placeholder="Например: принято логистом" />
           </label>
+
           <button type="button" :disabled="loadingId === order.id" @click="updateStatus(order)">
             {{ loadingId === order.id ? 'Сохраняем...' : 'Обновить статус' }}
           </button>
@@ -53,6 +75,7 @@
         <details class="history" @toggle="onHistoryToggle($event, order.id)">
           <summary>История заявки</summary>
           <div v-if="historyLoadingId === order.id" class="muted">Загружаем историю...</div>
+
           <div v-else-if="history[order.id]?.length" class="history-list">
             <div v-for="item in history[order.id]" :key="item.id" class="history-item">
               <b>{{ labelFromMap(orderStatusLabels, item.new_status) }}</b>
@@ -60,17 +83,18 @@
               <small>{{ translateComment(item.comment) }}</small>
             </div>
           </div>
+
           <div v-else class="muted">Истории пока нет</div>
         </details>
       </article>
     </div>
 
-    <div v-if="!orders.length && !error" class="empty">Заявки не найдены</div>
+    <div v-if="!filteredOrders.length && !error" class="empty">Заявки не найдены</div>
   </section>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import BaseSelect from '@/shared/ui/BaseSelect.vue'
 import { apiFetch } from '@/shared/api/http'
 import {
@@ -95,11 +119,29 @@ const orders = ref([])
 const warehouses = ref([])
 const forms = reactive({})
 const history = reactive({})
-const filters = reactive({ status: '', handoverType: '' })
+const filters = reactive({ status: '', handoverType: '', warehouseId: '' })
 const error = ref('')
 const success = ref('')
 const loadingId = ref(null)
 const historyLoadingId = ref(null)
+
+const warehouseOptions = computed(() => [
+  { value: '', label: 'Все склады' },
+  ...warehouses.value.map((warehouse) => ({
+    value: String(warehouse.id),
+    label: warehouseName(warehouse.id, warehouses.value),
+    description: warehouse.address || warehouse.city || '',
+  })),
+])
+
+const filteredOrders = computed(() => {
+  return orders.value.filter((order) => {
+    if (!filters.warehouseId) return true
+
+    const id = Number(filters.warehouseId)
+    return Number(order.receiving_warehouse_id) === id || Number(order.destination_warehouse_id) === id
+  })
+})
 
 function ensureForm(order) {
   if (!forms[order.id]) forms[order.id] = { status: order.status || 'created', comment: '' }
@@ -111,6 +153,7 @@ function totalPlaces(order) {
 
 function translateComment(comment) {
   if (!comment) return 'Без комментария'
+
   return String(comment)
     .replaceAll('created', 'создана')
     .replaceAll('received', 'принята')
@@ -126,9 +169,11 @@ async function loadWarehouses() {
 async function loadOrders() {
   error.value = ''
   success.value = ''
+
   const params = new URLSearchParams({ limit: '100' })
   if (filters.status) params.set('status', filters.status)
   if (filters.handoverType) params.set('handover_type', filters.handoverType)
+
   try {
     const payload = await apiFetch(`/orders?${params}`, { auth: true })
     orders.value = unwrapList(payload, 'orders')
@@ -142,16 +187,21 @@ async function updateStatus(order) {
   loadingId.value = order.id
   error.value = ''
   success.value = ''
+
   const form = forms[order.id]
+
   try {
     const payload = await apiFetch(`/orders/${order.id}/status`, {
       auth: true,
       method: 'PATCH',
       body: { status: form.status, comment: form.comment || undefined },
     })
+
     const updated = unwrapOne(payload, 'order') || { ...order, status: form.status }
     const index = orders.value.findIndex((item) => item.id === order.id)
+
     if (index !== -1) orders.value[index] = updated
+
     forms[order.id] = { status: updated.status, comment: '' }
     delete history[order.id]
     success.value = `Статус заявки #${order.id} обновлён`
@@ -164,7 +214,9 @@ async function updateStatus(order) {
 
 async function onHistoryToggle(event, orderId) {
   if (!event.target.open || history[orderId]) return
+
   historyLoadingId.value = orderId
+
   try {
     const payload = await apiFetch(`/orders/${orderId}/history`, { auth: true })
     history[orderId] = unwrapList(payload, 'history')
@@ -189,7 +241,8 @@ onMounted(async () => {
 .toolbar { display:flex; align-items:end; justify-content:space-between; gap:18px; }
 .toolbar p { margin:0 0 8px; color:#ff3f4d; letter-spacing:.22em; text-transform:uppercase; font-size:12px; font-weight:950; }
 .toolbar h2 { margin:0; font-size:34px; letter-spacing:-.04em; }
-.filters { display:grid; grid-template-columns: minmax(180px, 260px) minmax(180px, 260px) auto; gap:12px; align-items:end; }
+.filters { display:grid; gap:12px; align-items:end; }
+.filters--orders { grid-template-columns: minmax(180px, 240px) minmax(200px, 270px) minmax(190px, 280px) auto; }
 .filters > button { min-height:58px; border:0; border-radius:18px; padding:0 20px; background:#07101f; color:white; font-weight:950; cursor:pointer; font-family:inherit; }
 .orders-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:20px; }
 .order-card { display:flex; flex-direction:column; gap:18px; }
@@ -212,6 +265,10 @@ input { min-height:58px; border:1px solid #dbe3ef; border-radius:18px; padding:0
 .history-item { display:grid; gap:4px; padding:12px; border-radius:16px; background:white; }
 .history-item span, .history-item small, .muted { color:#64748b; font-weight:800; }
 .empty { text-align:center; color:#64748b; font-weight:950; }
+@media (max-width: 1280px) {
+  .filters--orders { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .filters--orders > button { grid-column: 1 / -1; }
+}
 @media (max-width: 1180px) {
   .orders-grid { grid-template-columns:1fr; }
   .toolbar { display:grid; }

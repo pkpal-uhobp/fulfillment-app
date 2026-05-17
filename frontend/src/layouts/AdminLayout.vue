@@ -14,11 +14,6 @@ const adminItems = [
   { to: '/admin/warehouses', label: 'Склады и зоны', icon: '▤' },
 ]
 
-const panelItems = [
-  { to: '/client', label: 'Панель клиента', icon: '◌' },
-  { to: '/logist', label: 'Панель логиста', icon: '◆' },
-  { to: '/worker', label: 'Панель рабочего', icon: '▣' },
-]
 
 const initials = computed(() => {
   const source = user.value?.full_name || user.value?.email || 'Администратор'
@@ -81,20 +76,6 @@ onMounted(refreshMe)
           :to="item.to"
           class="admin-nav__item"
           :class="{ active: isActive(item) }"
-          @click="menuOpen = false"
-        >
-          <i>{{ item.icon }}</i>
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
-
-      <div class="nav-group-title">Переключиться в панель</div>
-      <nav class="admin-nav panel-nav" aria-label="Переключение ролей">
-        <RouterLink
-          v-for="item in panelItems"
-          :key="item.to"
-          :to="item.to"
-          class="admin-nav__item ghost"
           @click="menuOpen = false"
         >
           <i>{{ item.icon }}</i>
@@ -233,9 +214,6 @@ onMounted(refreshMe)
   color: #fff;
 }
 
-.admin-nav__item.ghost {
-  background: rgba(255, 255, 255, .04);
-}
 
 .admin-user-card {
   margin-top: auto;

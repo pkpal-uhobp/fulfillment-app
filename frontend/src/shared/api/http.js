@@ -49,13 +49,28 @@ export function getRefreshToken() {
   return localStorage.getItem('refresh_token') || ''
 }
 
+function userFromToken(token = getAccessToken()) {
+  const payload = token ? parseJwtPayload(token) : null
+
+  if (!payload) return null
+
+  return {
+    id: payload.user_id || payload.sub || payload.id,
+    email: payload.email || '',
+    full_name: payload.full_name || payload.name || payload.email || 'Пользователь',
+    role: String(payload.role || '').toLowerCase(),
+  }
+}
+
 export function getCurrentUser() {
   try {
     const raw = localStorage.getItem('current_user')
 
-    return raw ? JSON.parse(raw) : null
+    if (raw) return JSON.parse(raw)
+
+    return userFromToken()
   } catch {
-    return null
+    return userFromToken()
   }
 }
 
@@ -70,6 +85,29 @@ export function clearAuth() {
   notifyAuthChanged()
 }
 
+function isTokenExpired(token) {
+  const payload = parseJwtPayload(token)
+
+  if (!payload?.exp) return false
+
+  return Number(payload.exp) * 1000 <= Date.now()
+}
+
+function redirectToMainScreen() {
+  if (typeof window === 'undefined') return
+
+  const currentPath = window.location.pathname
+
+  if (currentPath === '/') return
+
+  window.location.assign('/')
+}
+
+export function expireSessionAndGoHome() {
+  clearAuth()
+  redirectToMainScreen()
+}
+
 function normalizeUser(payload, token) {
   const user = payload?.user || payload?.me || payload?.profile || payload || null
 
@@ -80,16 +118,33 @@ function normalizeUser(payload, token) {
     }
   }
 
-  const jwtPayload = token ? parseJwtPayload(token) : null
+  return userFromToken(token)
+}
 
-  return jwtPayload
-    ? {
-        id: jwtPayload.user_id || jwtPayload.sub || jwtPayload.id,
-        email: jwtPayload.email || '',
-        full_name: jwtPayload.full_name || jwtPayload.name || jwtPayload.email || 'Пользователь',
-        role: String(jwtPayload.role || '').toLowerCase(),
-      }
-    : null
+function isTokenErrorPayload(data) {
+  const message = [
+    data?.error,
+    data?.message,
+    data?.detail,
+    data?.code,
+    typeof data === 'string' ? data : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    message.includes('token') ||
+    message.includes('jwt') ||
+    message.includes('unauthorized') ||
+    message.includes('authorization') ||
+    message.includes('forbidden') ||
+    message.includes('expired') ||
+    message.includes('invalid') ||
+    message.includes('недейств') ||
+    message.includes('истек') ||
+    message.includes('авторизац')
+  )
 }
 
 export function saveAuth(payload = {}) {
@@ -147,7 +202,14 @@ export async function apiFetch(path, options = {}) {
   if (auth) {
     const token = getAccessToken()
 
-    if (token) requestHeaders.set('Authorization', `Bearer ${token}`)
+    if (!token || isTokenExpired(token)) {
+      expireSessionAndGoHome()
+      const error = new Error('Сессия истекла. Выполните вход снова.')
+      error.status = 401
+      throw error
+    }
+
+    requestHeaders.set('Authorization', `Bearer ${token}`)
   }
 
   const response = await fetch(buildUrl(path), {
@@ -168,6 +230,12 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (!response.ok) {
+    const tokenProblem = auth && (response.status === 401 || isTokenErrorPayload(data))
+
+    if (tokenProblem) {
+      expireSessionAndGoHome()
+    }
+
     const error = new Error(data?.error || data?.message || data?.detail || `HTTP ${response.status}`)
     error.status = response.status
     error.data = data
@@ -177,9 +245,9 @@ export async function apiFetch(path, options = {}) {
   return data
 }
 
+// Не делает сетевой запрос. Нужен для старых импортов, чтобы больше не спамить /auth/me.
 export async function loadMe() {
-  const data = await apiFetch('/auth/me', { auth: true })
-  const user = normalizeUser(data, getAccessToken())
+  const user = getCurrentUser()
 
   if (user) {
     localStorage.setItem('current_user', JSON.stringify(user))

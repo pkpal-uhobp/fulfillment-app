@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { getCurrentUser, loadMe } from '@/shared/api/http'
+import { getCurrentUser } from '@/shared/api/http'
 
 const route = useRoute()
 const open = ref(false)
@@ -32,16 +32,8 @@ function refreshFromStorage() {
   user.value = getCurrentUser()
 }
 
-async function refreshUser() {
+function refreshUser() {
   refreshFromStorage()
-
-  if (!user.value && localStorage.getItem('access_token')) {
-    try {
-      user.value = await loadMe()
-    } catch {
-      refreshFromStorage()
-    }
-  }
 }
 
 function onDocumentClick(event) {
