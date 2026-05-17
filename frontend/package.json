@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@lucide/vue": "^1.16.0",
+    "@lucide/vue": "latest",
     "@vitejs/plugin-vue": "latest",
     "axios": "latest",
     "html5-qrcode": "latest",

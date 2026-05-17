@@ -15,13 +15,20 @@ const routes = [
       { path: 'register', name: 'register', component: RegisterPage },
     ],
   },
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundPage,
+  },
 ]
 
 export default createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to) {
+    if (to.hash) {
+      return { el: to.hash, top: 96, behavior: 'smooth' }
+    }
     return { top: 0 }
   },
 })

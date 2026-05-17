@@ -26,10 +26,10 @@ async function submit() {
   try {
     const payload = await apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         email: email.value.trim(),
         password: password.value,
-      }),
+      },
     })
 
     const { user } = saveAuth(payload)

@@ -28,12 +28,12 @@ async function submit() {
   try {
     const payload = await apiFetch('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         full_name: fullName.value.trim(),
         email: email.value.trim(),
         phone: phone.value.trim() || undefined,
         password: password.value,
-      }),
+      },
     })
 
     const { user } = saveAuth(payload)
