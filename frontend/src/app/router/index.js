@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
 import PublicLayout from '@/layouts/PublicLayout.vue'
 import LandingPage from '@/pages/public/LandingPage.vue'
 import LoginPage from '@/pages/auth/LoginPage.vue'
 import RegisterPage from '@/pages/auth/RegisterPage.vue'
+
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import ClientDashboardPage from '@/pages/client/ClientDashboardPage.vue'
 import ClientOrdersPage from '@/pages/client/ClientOrdersPage.vue'
@@ -10,6 +12,7 @@ import ClientCreateOrderPage from '@/pages/client/ClientCreateOrderPage.vue'
 import ClientOrderDetailsPage from '@/pages/client/ClientOrderDetailsPage.vue'
 import ClientCargoItemsPage from '@/pages/client/ClientCargoItemsPage.vue'
 import ClientProfilePage from '@/pages/client/ClientProfilePage.vue'
+
 import LogistLayout from '@/layouts/LogistLayout.vue'
 import LogistDashboardPage from '@/pages/logist/LogistDashboardPage.vue'
 import LogistOrdersPage from '@/pages/logist/LogistOrdersPage.vue'
@@ -19,10 +22,14 @@ import LogistShipmentsPage from '@/pages/logist/LogistShipmentsPage.vue'
 import LogistShipmentDetailsPage from '@/pages/logist/LogistShipmentDetailsPage.vue'
 import LogistWarehousesPage from '@/pages/logist/LogistWarehousesPage.vue'
 import LogistProfilePage from '@/pages/logist/LogistProfilePage.vue'
+
 import WorkerLayout from '@/layouts/WorkerLayout.vue'
 import WorkerDashboardPage from '@/pages/worker/WorkerDashboardPage.vue'
+import WorkerOrdersPage from '@/pages/worker/WorkerOrdersPage.vue'
 import WorkerScanPage from '@/pages/worker/WorkerScanPage.vue'
 import WorkerCargoItemsPage from '@/pages/worker/WorkerCargoItemsPage.vue'
+import WorkerProfilePage from '@/pages/worker/WorkerProfilePage.vue'
+
 import CargoItemDetailsPage from '@/pages/cargo/CargoItemDetailsPage.vue'
 import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
 import { getAccessToken, getCurrentUser } from '@/shared/api/http'
@@ -71,9 +78,10 @@ const routes = [
     meta: { requiresAuth: true, roles: ['worker', 'admin'] },
     children: [
       { path: '', name: 'worker-dashboard', component: WorkerDashboardPage },
+      { path: 'orders', name: 'worker-orders', component: WorkerOrdersPage },
       { path: 'scan', name: 'worker-scan', component: WorkerScanPage },
       { path: 'cargo-items', name: 'worker-cargo-items', component: WorkerCargoItemsPage },
-      { path: 'profile', redirect: '/worker' },
+      { path: 'profile', name: 'worker-profile', component: WorkerProfilePage },
     ],
   },
   {
@@ -83,33 +91,59 @@ const routes = [
     props: true,
     meta: { requiresAuth: true },
   },
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundPage,
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior(to) {
-    if (to.hash) return { el: to.hash, top: 96, behavior: 'smooth' }
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+
+    if (to.hash) {
+      return {
+        el: to.hash,
+        top: 96,
+        behavior: 'smooth',
+      }
+    }
+
+    if (to.path === from.path) {
+      return false
+    }
+
     return { top: 0 }
   },
 })
 
 function homeForRole(role) {
-  if (role === 'worker') return '/worker'
+  if (role === 'worker' || role === 'warehouse_worker') return '/worker'
   if (role === 'logist' || role === 'admin') return '/logist'
   return '/client'
 }
 
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !getAccessToken()) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+    return {
+      name: 'login',
+      query: { redirect: to.fullPath },
+    }
   }
 
   const allowed = to.meta.roles
+
   if (allowed?.length) {
     const role = getCurrentUser()?.role
-    if (role && !allowed.includes(role)) return homeForRole(role)
+
+    if (role && !allowed.includes(role)) {
+      return homeForRole(role)
+    }
   }
 
   return true
