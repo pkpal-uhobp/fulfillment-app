@@ -1,171 +1,115 @@
-<script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronDown, Check } from '@lucide/vue'
-
-const props = defineProps({
-  modelValue: { type: [String, Number, Boolean, null], default: '' },
-  options: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'Выберите значение' },
-  disabled: { type: Boolean, default: false },
-  compact: { type: Boolean, default: false },
-  error: { type: String, default: '' },
-  popupClass: { type: String, default: '' },
-})
-
-const emit = defineEmits(['update:modelValue', 'change', 'open', 'close'])
-const root = ref(null)
-const open = ref(false)
-const menuStyle = ref({})
-const previousOverflow = ref('')
-const previousPaddingRight = ref('')
-
-const normalizedOptions = computed(() => props.options.map((option) => {
-  if (typeof option === 'object' && option !== null) return option
-  return { value: option, label: String(option) }
-}))
-
-const selected = computed(() => normalizedOptions.value.find((option) => String(option.value) === String(props.modelValue)))
-const selectedLabel = computed(() => selected.value?.label || props.placeholder)
-
-function scrollbarWidth() {
-  return window.innerWidth - document.documentElement.clientWidth
-}
-
-function lockScroll() {
-  previousOverflow.value = document.body.style.overflow
-  previousPaddingRight.value = document.body.style.paddingRight
-  const width = scrollbarWidth()
-  document.body.style.overflow = 'hidden'
-  if (width > 0) document.body.style.paddingRight = `${width}px`
-}
-
-function unlockScroll() {
-  document.body.style.overflow = previousOverflow.value
-  document.body.style.paddingRight = previousPaddingRight.value
-}
-
-function updatePosition() {
-  if (!root.value) return
-  const rect = root.value.getBoundingClientRect()
-  const gap = 8
-  const margin = 16
-  const width = Math.min(rect.width, window.innerWidth - margin * 2)
-  const left = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin)
-  const spaceBelow = window.innerHeight - rect.bottom - margin
-  const spaceAbove = rect.top - margin
-  const openAbove = spaceBelow < 240 && spaceAbove > spaceBelow
-  const maxHeight = Math.max(180, Math.min(360, openAbove ? spaceAbove - gap : spaceBelow - gap))
-  const top = openAbove ? Math.max(margin, rect.top - gap - maxHeight) : rect.bottom + gap
-
-  menuStyle.value = {
-    left: `${left}px`,
-    top: `${top}px`,
-    width: `${width}px`,
-    maxHeight: `${maxHeight}px`,
-  }
-}
-
-async function setOpen(value) {
-  if (props.disabled) return
-  open.value = value
-  if (value) {
-    await nextTick()
-    updatePosition()
-    emit('open')
-  } else {
-    emit('close')
-  }
-}
-
-function toggle() {
-  setOpen(!open.value)
-}
-
-function choose(option) {
-  if (option.disabled) return
-  emit('update:modelValue', option.value)
-  emit('change', option.value)
-  setOpen(false)
-}
-
-function onDocumentClick(event) {
-  if (!root.value?.contains(event.target)) setOpen(false)
-}
-
-function onKeydown(event) {
-  if (event.key === 'Escape') setOpen(false)
-}
-
-watch(open, (value) => {
-  if (value) lockScroll()
-  else unlockScroll()
-})
-
-onMounted(() => {
-  document.addEventListener('click', onDocumentClick)
-  document.addEventListener('keydown', onKeydown)
-  window.addEventListener('resize', updatePosition)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocumentClick)
-  document.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('resize', updatePosition)
-  if (open.value) unlockScroll()
-})
-</script>
-
 <template>
-  <div ref="root" class="relative">
-    <button
-      type="button"
-      class="group flex w-full items-center justify-between gap-3 rounded-[1.35rem] border bg-slate-50 text-left font-black text-[#07101f] outline-none transition disabled:cursor-not-allowed disabled:opacity-60"
-      :class="[
-        compact ? 'px-4 py-3 text-sm' : 'px-5 py-4 text-base',
-        error ? 'border-[#ff4248] bg-red-50/60 shadow-[0_0_0_4px_rgba(255,66,72,0.10)]' : open ? 'border-[#ff4248] bg-white shadow-[0_0_0_4px_rgba(255,66,72,0.10)]' : 'border-slate-200 hover:border-slate-300',
-      ]"
-      :disabled="disabled"
-      @click="toggle"
-    >
-      <span class="min-w-0 truncate" :class="selected ? 'text-[#07101f]' : 'text-slate-400'">
-        {{ selectedLabel }}
-      </span>
-      <ChevronDown class="h-5 w-5 shrink-0 text-slate-500 transition" :class="open ? 'rotate-180 text-[#ff4248]' : ''" />
+  <div ref="root" class="ft-select">
+    <label v-if="label" class="ft-label">{{ label }}</label>
+    <button ref="button" type="button" class="ft-trigger" :class="{ open, error: error }" :disabled="disabled" @click="toggle">
+      <span :class="{ placeholder: !selected }">{{ selected ? optLabel(selected) : placeholder }}</span>
+      <span class="chevron" :class="{ rotate: open }">⌄</span>
     </button>
-
-    <p v-if="error" class="mt-2 text-sm font-bold text-[#e11d48]">{{ error }}</p>
+    <p v-if="error" class="ft-error">{{ error }}</p>
 
     <Teleport to="body">
-      <div v-if="open" class="fixed inset-0 z-[999] bg-transparent" @click.self="setOpen(false)"></div>
-      <div
-        v-if="open"
-        class="fixed z-[1000] overflow-y-auto overscroll-contain rounded-[1.35rem] border border-slate-200 bg-white p-2 text-[#07101f] shadow-[0_30px_90px_rgba(15,23,42,0.24)]"
-        :class="popupClass"
-        :style="menuStyle"
-      >
+      <div v-show="open" ref="dropdown" class="ft-menu" :style="menuStyle" @wheel.stop @touchmove.stop>
+        <input v-if="searchable" v-model="q" class="ft-search" placeholder="Поиск" />
         <button
-          v-for="option in normalizedOptions"
-          :key="String(option.value)"
+          v-for="option in filtered"
+          :key="String(optValue(option))"
           type="button"
-          class="flex w-full items-start justify-between gap-3 rounded-2xl px-4 py-3 text-left font-black transition"
-          :class="[
-            String(option.value) === String(modelValue) ? 'bg-[#ff4248] text-white hover:bg-[#ff4248]' : 'text-[#07101f] hover:bg-slate-50',
-            option.disabled ? 'cursor-not-allowed opacity-45' : '',
-          ]"
-          :disabled="option.disabled"
+          class="ft-option"
+          :class="{ active: String(optValue(option)) === String(modelValue), disabled: option?.disabled }"
+          :disabled="option?.disabled"
           @click="choose(option)"
         >
-          <span class="min-w-0">
-            <span class="block leading-5">{{ option.label }}</span>
-            <span v-if="option.description" class="mt-1 block text-xs font-bold opacity-65">{{ option.description }}</span>
+          <span>
+            <strong>{{ optLabel(option) }}</strong>
+            <small v-if="optDesc(option)">{{ optDesc(option) }}</small>
           </span>
-          <Check v-if="String(option.value) === String(modelValue)" class="mt-0.5 h-4 w-4 shrink-0" />
+          <b v-if="String(optValue(option)) === String(modelValue)">✓</b>
         </button>
-
-        <div v-if="!normalizedOptions.length" class="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-bold text-slate-500">
-          Нет доступных вариантов
-        </div>
+        <div v-if="!filtered.length" class="ft-empty">{{ emptyText }}</div>
       </div>
     </Teleport>
   </div>
 </template>
+
+<script setup>
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+
+const props = defineProps({
+  modelValue: { type: [String, Number, Boolean, null], default: null },
+  options: { type: Array, default: () => [] },
+  label: { type: String, default: '' },
+  placeholder: { type: String, default: 'Выберите значение' },
+  optionLabel: { type: String, default: 'label' },
+  optionValue: { type: String, default: 'value' },
+  optionDescription: { type: String, default: 'description' },
+  error: { type: String, default: '' },
+  disabled: { type: Boolean, default: false },
+  searchable: { type: Boolean, default: false },
+  emptyText: { type: String, default: 'Нет значений' },
+})
+const emit = defineEmits(['update:modelValue', 'change'])
+
+const root = ref(null)
+const button = ref(null)
+const dropdown = ref(null)
+const open = ref(false)
+const q = ref('')
+const menuStyle = ref({})
+let oldOverflow = ''
+let oldPadding = ''
+
+const selected = computed(() => props.options.find((o) => String(optValue(o)) === String(props.modelValue)))
+const filtered = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  if (!term) return props.options
+  return props.options.filter((o) => `${optLabel(o)} ${optDesc(o)}`.toLowerCase().includes(term))
+})
+
+function optLabel(o) { return typeof o === 'object' ? String(o?.[props.optionLabel] ?? o?.name ?? o?.title ?? o?.value ?? '') : String(o ?? '') }
+function optValue(o) { return typeof o === 'object' ? (o?.[props.optionValue] ?? o?.id ?? o?.value) : o }
+function optDesc(o) { return typeof o === 'object' ? String(o?.[props.optionDescription] ?? o?.description ?? o?.subtitle ?? '') : '' }
+
+function lock() {
+  oldOverflow = document.body.style.overflow
+  oldPadding = document.body.style.paddingRight
+  const w = window.innerWidth - document.documentElement.clientWidth
+  document.body.style.overflow = 'hidden'
+  if (w > 0) document.body.style.paddingRight = `${w}px`
+}
+function unlock() { document.body.style.overflow = oldOverflow; document.body.style.paddingRight = oldPadding }
+function position() {
+  const r = button.value?.getBoundingClientRect()
+  if (!r) return
+  const h = Math.min(360, Math.max(90, props.options.length * 70 + (props.searchable ? 64 : 0)))
+  const up = r.bottom + h + 12 > window.innerHeight
+  menuStyle.value = {
+    left: `${Math.max(12, Math.min(r.left, window.innerWidth - r.width - 12))}px`,
+    top: `${up ? Math.max(12, r.top - h - 10) : r.bottom + 10}px`,
+    width: `${r.width}px`,
+    maxHeight: `${Math.min(360, up ? r.top - 24 : window.innerHeight - r.bottom - 24)}px`,
+  }
+}
+async function show() {
+  if (props.disabled || open.value) return
+  open.value = true; q.value = ''; lock(); await nextTick(); position()
+  window.addEventListener('resize', position)
+  window.addEventListener('click', outside, true)
+  window.addEventListener('keydown', esc)
+}
+function hide() {
+  if (!open.value) return
+  open.value = false; unlock()
+  window.removeEventListener('resize', position)
+  window.removeEventListener('click', outside, true)
+  window.removeEventListener('keydown', esc)
+}
+function toggle() { open.value ? hide() : show() }
+function outside(e) { if (!root.value?.contains(e.target) && !dropdown.value?.contains(e.target)) hide() }
+function esc(e) { if (e.key === 'Escape') hide() }
+function choose(o) { if (o?.disabled) return; emit('update:modelValue', optValue(o)); emit('change', o); hide() }
+onBeforeUnmount(hide)
+</script>
+
+<style scoped>
+.ft-label{display:block;margin:0 0 10px;color:#94a3b8;font-size:12px;font-weight:950;letter-spacing:.28em;text-transform:uppercase}.ft-trigger{width:100%;min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 20px;border:1px solid #dce5f0;border-radius:20px;background:#f7faff;color:#07101f;font:inherit;font-weight:950;text-align:left;cursor:pointer;transition:.18s}.ft-trigger:hover,.ft-trigger.open{border-color:#ff3f4c;background:white;box-shadow:0 18px 42px rgba(255,63,76,.14)}.ft-trigger.error{border-color:#ff3f4c;background:#fff5f6}.placeholder{color:#8da0ba}.chevron{font-size:28px;line-height:1;color:#65758b;transition:.18s}.chevron.rotate{transform:rotate(180deg)}.ft-error{margin:9px 0 0;color:#ff3f4c;font-weight:850;font-size:13px}.ft-menu{position:fixed;z-index:9999;overflow:auto;padding:10px;border:1px solid rgba(220,229,240,.95);border-radius:24px;background:rgba(255,255,255,.98);box-shadow:0 34px 80px rgba(7,16,31,.24);backdrop-filter:blur(16px)}.ft-menu::-webkit-scrollbar{width:8px}.ft-menu::-webkit-scrollbar-thumb{background:#c8d3e0;border-radius:999px}.ft-search{width:100%;height:50px;margin-bottom:8px;padding:0 14px;border:0;border-radius:16px;background:#f3f6fa;color:#07101f;font:inherit;font-weight:850;outline:0}.ft-option{width:100%;min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;border:0;border-radius:18px;background:transparent;color:#07101f;font:inherit;text-align:left;cursor:pointer}.ft-option:hover{background:#f1f5fb}.ft-option.active{background:#ff3f4c;color:white}.ft-option.disabled{opacity:.55;cursor:not-allowed}.ft-option strong{display:block;font-weight:950;line-height:1.2}.ft-option small{display:block;margin-top:6px;color:#6b7d95;font-size:13px;font-weight:800}.ft-option.active small{color:rgba(255,255,255,.82)}.ft-empty{padding:18px;color:#7b8da7;font-weight:850}
+</style>
