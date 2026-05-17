@@ -268,10 +268,10 @@ onBeforeUnmount(() => {
 
         <div class="hidden items-center gap-3 lg:flex">
           <template v-if="isAuthorized">
-            <div class="flex items-center gap-3 rounded-2xl border px-4 py-3" :class="headerTheme === 'light' ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-white/5'">
+            <RouterLink to="/client" class="flex items-center gap-3 rounded-2xl border px-4 py-3 transition hover:-translate-y-0.5" :class="headerTheme === 'light' ? 'border-slate-200 bg-slate-50 hover:bg-white' : 'border-white/10 bg-white/5 hover:bg-white/10'">
               <User class="h-4 w-4 text-[#ff5962]" />
               <span class="max-w-[190px] truncate text-sm font-black">{{ userDisplayName }}</span>
-            </div>
+            </RouterLink>
             <button
               type="button"
               class="inline-flex items-center gap-2 rounded-2xl border px-5 py-3 text-sm font-black transition hover:-translate-y-0.5"
@@ -322,7 +322,7 @@ onBeforeUnmount(() => {
 
             <div class="mt-3 border-t border-white/10 pt-3">
               <template v-if="isAuthorized">
-                <div class="rounded-2xl bg-white/5 px-4 py-3 text-sm font-black">{{ userDisplayName }}</div>
+                <RouterLink to="/client" class="block rounded-2xl bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10" @click="desktopMoreOpen = false">{{ userDisplayName }}</RouterLink>
                 <button class="mt-2 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950" @click="logout">Выйти</button>
               </template>
               <template v-else>
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
           </a>
 
           <template v-if="isAuthorized">
-            <div class="mt-3 rounded-2xl bg-white/5 px-4 py-3 font-black">{{ userDisplayName }}</div>
+            <RouterLink to="/client" class="mt-3 rounded-2xl bg-white/5 px-4 py-3 font-black hover:bg-white/10" @click="mobileMenuOpen = false">{{ userDisplayName }}</RouterLink>
             <button class="rounded-2xl bg-white px-4 py-4 font-black text-slate-950" @click="logout">Выйти</button>
           </template>
 

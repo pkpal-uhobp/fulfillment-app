@@ -1,10 +1,11 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, LockKeyhole, Mail } from '@lucide/vue'
 import { apiFetch, saveAuth } from '@/shared/api/http'
 
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
@@ -35,7 +36,7 @@ async function submit() {
     const { user } = saveAuth(payload)
     success.value = `Вы вошли как ${user?.full_name || user?.email || 'пользователь'}.`
 
-    setTimeout(() => router.push('/'), 350)
+    setTimeout(() => router.push(route.query.redirect || '/client'), 350)
   } catch (err) {
     error.value = err?.message || 'Не удалось войти. Проверьте email и пароль.'
   } finally {

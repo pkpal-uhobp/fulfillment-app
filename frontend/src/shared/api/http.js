@@ -188,3 +188,11 @@ export async function apiFetch(path, options = {}) {
 
   return payload
 }
+
+export function updateCurrentUserLocal(patch = {}) {
+  const current = getCurrentUser() || {}
+  const next = { ...current, ...patch }
+  localStorage.setItem('current_user', JSON.stringify(next))
+  window.dispatchEvent(new CustomEvent('auth:changed'))
+  return next
+}
