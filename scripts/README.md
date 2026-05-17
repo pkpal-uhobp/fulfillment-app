@@ -3,7 +3,8 @@
 Run this script after applying all migrations, including catalog seed migration.
 
 ```powershell
-psql -h localhost -p 5433 -U postgres -d fulfillment-app -f scripts/seed_test_data.sql
+docker cp .\scripts\seed_test_data.sql fulfillment-env-postgres:/tmp/seed_test_data.sql
+docker exec -i fulfillment-env-postgres psql -U postgres -d fulfillment-app -v ON_ERROR_STOP=1 -f /tmp/seed_test_data.sql
 ```
 
 Test users:
