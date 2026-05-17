@@ -1,35 +1,35 @@
 # Users tests
 
-Структура разделена по слоям фичи `users`:
+The structure is split by feature layers:
 
 ```text
 test/feature/users/
-├── service/tests                 # unit-тесты UsersService через fake repository
-├── transport/http/tests          # unit-тесты HTTP handlers через fake service
-└── repository/postgres/tests     # integration-тесты PostgreSQL под build tag integration
+├── service/tests                 # UsersService unit tests with fake repository
+├── transport/http/tests          # HTTP handlers unit tests with fake service
+└── repository/postgres/tests     # PostgreSQL integration tests (integration build tag)
 ```
 
-## Запуск обычных unit-тестов
+## Run all unit tests
 
-Из корня репозитория:
+From the repository root:
 
 ```bash
 go test ./test/feature/users/... -v
 ```
 
-## Запуск только service-слоя
+## Run only service layer
 
 ```bash
 go test ./test/feature/users/service/tests -v
 ```
 
-## Запуск только HTTP-слоя
+## Run only HTTP layer
 
 ```bash
 go test ./test/feature/users/transport/http/tests -v
 ```
 
-## Покрытие фичи users
+## Coverage for users feature
 
 PowerShell:
 
@@ -50,4 +50,4 @@ PATCH  /api/v1/users/{id}/block
 DELETE /api/v1/users/{id}
 ```
 
-Роль не указана в endpoint-е. Доступ ограничивается через role middleware: все маршруты доступны только `admin`.
+All users endpoints require `Admin` role (enforced by role middleware).

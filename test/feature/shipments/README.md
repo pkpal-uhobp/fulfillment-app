@@ -1,35 +1,35 @@
 # Shipments tests
 
-Структура разделена по слоям фичи `shipments`:
+The structure is split by feature layers:
 
 ```text
 test/feature/shipments/
-├── service/tests                 # unit-тесты ShipmentsService через fake repository
-├── transport/http/tests          # unit-тесты HTTP handlers через fake service
-└── repository/postgres/tests     # integration-тесты PostgreSQL под build tag integration
+├── service/tests                 # ShipmentsService unit tests with fake repository
+├── transport/http/tests          # HTTP handlers unit tests with fake service
+└── repository/postgres/tests     # PostgreSQL integration tests (integration build tag)
 ```
 
-## Запуск обычных unit-тестов
+## Run all unit tests
 
-Из корня репозитория:
+From the repository root:
 
 ```bash
 go test ./test/feature/shipments/... -v
 ```
 
-## Запуск только service-слоя
+## Run only service layer
 
 ```bash
 go test ./test/feature/shipments/service/tests -v
 ```
 
-## Запуск только HTTP-слоя
+## Run only HTTP layer
 
 ```bash
 go test ./test/feature/shipments/transport/http/tests -v
 ```
 
-## Проверка покрытия
+## Coverage
 
 ```powershell
 $COVERPKG = (go list ./internal/features/shipments/... ./internal/core/domain) -join ","
@@ -38,13 +38,13 @@ go tool cover -func="coverage_shipments.out"
 go tool cover -html="coverage_shipments.out"
 ```
 
-## PostgreSQL integration-тесты
+## PostgreSQL integration tests
 
-Перед запуском должна быть поднята БД и применены миграции.
+PostgreSQL must be running and migrations applied.
 
 ```powershell
 $env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
+$env:POSTGRES_PORT="5433"
 $env:POSTGRES_USER="postgres"
 $env:POSTGRES_PASSWORD="root"
 $env:POSTGRES_DB="fulfillment-app"

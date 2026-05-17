@@ -4,26 +4,26 @@ All paths are relative to `/api/v1`.
 
 ## System
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
-| GET | /health | - |
+| GET | /health | Public |
 
 ## Auth
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
-| POST | /auth/register | - |
-| POST | /auth/login | - |
-| POST | /auth/refresh | - |
-| POST | /auth/logout | - |
-| GET | /auth/me | auth middleware |
+| POST | /auth/register | Public |
+| POST | /auth/login | Public |
+| POST | /auth/refresh | Public |
+| POST | /auth/logout | Public |
+| GET | /auth/me | Authenticated |
 
 ## Warehouses
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
-| GET | /warehouses | - |
-| GET | /warehouses/{id} | - |
+| GET | /warehouses | Public |
+| GET | /warehouses/{id} | Public |
 | POST | /warehouses | Admin |
 | PATCH | /warehouses/{id} | Admin |
 | PATCH | /warehouses/{id}/activate | Admin |
@@ -38,12 +38,12 @@ All paths are relative to `/api/v1`.
 | PATCH | /gates/{id} | Admin |
 | PATCH | /gates/{id}/activate | Admin |
 | DELETE | /gates/{id} | Admin |
-| GET | /product-types | - |
-| GET | /cargo-place-types | - |
+| GET | /product-types | Public |
+| GET | /cargo-place-types | Public |
 
 ## Pickup calendar
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
 | GET | /pickup-calendar | Client, Logist, Admin |
 | POST | /pickup-calendar/blocks | Logist, Admin |
@@ -52,7 +52,7 @@ All paths are relative to `/api/v1`.
 
 ## Orders
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
 | POST | /orders | Client |
 | GET | /orders | Client, Logist, Admin |
@@ -63,7 +63,7 @@ All paths are relative to `/api/v1`.
 
 ## Cargo items
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
 | POST | /orders/{id}/cargo-items | Worker, Admin |
 | GET | /cargo-items | Client, Worker, Logist, Admin |
@@ -77,7 +77,7 @@ All paths are relative to `/api/v1`.
 
 ## Shipments
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
 | POST | /shipments | Logist, Admin |
 | GET | /shipments | Logist, Admin |
@@ -88,7 +88,7 @@ All paths are relative to `/api/v1`.
 
 ## Users
 
-| Method | Path | Roles |
+| Method | Path | Access |
 | --- | --- | --- |
 | GET | /users | Admin |
 | POST | /users | Admin |

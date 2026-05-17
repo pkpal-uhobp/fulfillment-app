@@ -1,41 +1,41 @@
 # Orders tests
 
-Структура разделена по слоям фичи `orders`:
+The structure is split by feature layers:
 
 ```text
 test/feature/orders/
-├── service/tests                 # unit-тесты OrdersService через fake repository
-├── transport/http/tests          # unit-тесты HTTP handlers через fake service
-└── repository/postgres/tests     # integration-тесты PostgreSQL под build tag integration
+├── service/tests                 # OrdersService unit tests with fake repository
+├── transport/http/tests          # HTTP handlers unit tests with fake service
+└── repository/postgres/tests     # PostgreSQL integration tests (integration build tag)
 ```
 
-## Запуск обычных unit-тестов
+## Run all unit tests
 
-Из корня репозитория:
+From the repository root:
 
 ```bash
 go test ./test/feature/orders/... -v
 ```
 
-## Запуск только service-слоя
+## Run only service layer
 
 ```bash
 go test ./test/feature/orders/service/tests -v
 ```
 
-## Запуск только HTTP-слоя
+## Run only HTTP layer
 
 ```bash
 go test ./test/feature/orders/transport/http/tests -v
 ```
 
-## Запуск PostgreSQL integration-тестов
+## Run PostgreSQL integration tests
 
-Перед запуском должна быть поднята БД и применены миграции.
+PostgreSQL must be running and migrations applied.
 
-```bash
+```powershell
 $env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
+$env:POSTGRES_PORT="5433"
 $env:POSTGRES_USER="postgres"
 $env:POSTGRES_PASSWORD="root"
 $env:POSTGRES_DB="fulfillment-app"
@@ -43,11 +43,11 @@ $env:POSTGRES_SSL_MODE="disable"
 go test -tags=integration ./test/feature/orders/repository/postgres/tests -v
 ```
 
-Если переменные PostgreSQL не заданы, integration-тесты будут пропущены.
+If PostgreSQL variables are not set, integration tests are skipped.
 
-## Проверка покрытия service-слоя
+## Service layer coverage
 
-Так как тесты лежат отдельно от исходного кода, для корректного процента покрытия используй `-coverpkg`:
+Because tests are outside the source tree, use `-coverpkg` for accurate coverage:
 
 ```bash
 go test ./test/feature/orders/service/tests \
@@ -60,7 +60,7 @@ go tool cover -func=coverage_orders_service.out
 go tool cover -html=coverage_orders_service.out
 ```
 
-## Проверка покрытия всей фичи orders
+## Full orders feature coverage
 
 ```bash
 go test ./test/feature/orders/... \

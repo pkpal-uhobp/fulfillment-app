@@ -1,6 +1,6 @@
-# Warehouses tests by layers
+# Warehouses tests
 
-Структура архива:
+Structure:
 
 ```text
 test/feature/warehouses/
@@ -9,29 +9,31 @@ test/feature/warehouses/
 └── repository/postgres/tests
 ```
 
-Запуск всех unit/HTTP тестов:
+## Run all unit/HTTP tests
 
 ```bash
 go test ./test/feature/warehouses/... -v
 ```
 
-Запуск только service-тестов:
+## Run only service tests
 
 ```bash
 go test ./test/feature/warehouses/service/tests -v
 ```
 
-Запуск только HTTP-тестов:
+## Run only HTTP tests
 
 ```bash
 go test ./test/feature/warehouses/transport/http/tests -v
 ```
 
-Интеграционные PostgreSQL-тесты лежат под build tag `integration`, поэтому обычный `go test ./...` их не запускает:
+## PostgreSQL integration tests
 
-```bash
+Integration tests are under the `integration` build tag and are not run by `go test ./...`.
+
+```powershell
 $env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
+$env:POSTGRES_PORT="5433"
 $env:POSTGRES_USER="postgres"
 $env:POSTGRES_PASSWORD="root"
 $env:POSTGRES_DB="fulfillment-app"
@@ -39,4 +41,4 @@ $env:POSTGRES_SSL_MODE="disable"
 go test -tags=integration ./test/feature/warehouses/repository/postgres/tests -v
 ```
 
-Для реальных PostgreSQL-тестов нужно поднять тестовую БД, применить миграции и передать `WAREHOUSES_TEST_DATABASE_URL`.
+Note: repository integration tests are currently a placeholder. To enable real tests, set `WAREHOUSES_TEST_DATABASE_URL` and apply migrations for a dedicated test database.

@@ -1,35 +1,35 @@
 # Pickup calendar tests
 
-Структура разделена по слоям фичи `pickupcalendar`:
+The structure is split by feature layers:
 
 ```text
 test/feature/pickupcalendar/
-├── service/tests                 # unit-тесты PickupCalendarService через fake repository
-├── transport/http/tests          # unit-тесты HTTP handlers через fake service
-└── repository/postgres/tests     # integration-тесты PostgreSQL под build tag integration
+├── service/tests                 # PickupCalendarService unit tests with fake repository
+├── transport/http/tests          # HTTP handlers unit tests with fake service
+└── repository/postgres/tests     # PostgreSQL integration tests (integration build tag)
 ```
 
-## Запуск обычных unit-тестов
+## Run all unit tests
 
-Из корня репозитория:
+From the repository root:
 
 ```bash
 go test ./test/feature/pickupcalendar/... -v
 ```
 
-## Запуск только service-слоя
+## Run only service layer
 
 ```bash
 go test ./test/feature/pickupcalendar/service/tests -v
 ```
 
-## Запуск только HTTP-слоя
+## Run only HTTP layer
 
 ```bash
 go test ./test/feature/pickupcalendar/transport/http/tests -v
 ```
 
-## Покрытие pickup-calendar
+## Coverage for pickup calendar
 
 PowerShell:
 
@@ -40,13 +40,13 @@ go tool cover -func coverage_pickupcalendar.out
 go tool cover -html coverage_pickupcalendar.out
 ```
 
-## Запуск PostgreSQL integration-тестов
+## Run PostgreSQL integration tests
 
-Перед запуском должна быть поднята БД и применены миграции.
+PostgreSQL must be running and migrations applied.
 
-```bash
+```powershell
 $env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
+$env:POSTGRES_PORT="5433"
 $env:POSTGRES_USER="postgres"
 $env:POSTGRES_PASSWORD="root"
 $env:POSTGRES_DB="fulfillment-app"
@@ -54,4 +54,4 @@ $env:POSTGRES_SSL_MODE="disable"
 go test -tags=integration ./test/feature/pickupcalendar/repository/postgres/tests -v
 ```
 
-Если переменные PostgreSQL не заданы, integration-тесты будут пропущены.
+If PostgreSQL variables are not set, integration tests are skipped.

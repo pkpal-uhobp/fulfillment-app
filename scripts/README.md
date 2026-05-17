@@ -1,6 +1,6 @@
 # Test data seed
 
-Run this script after applying all migrations, including catalog seed migration.
+Run this script after applying all migrations, including the catalog seed migration.
 
 ```powershell
 docker cp .\scripts\seed_test_data.sql fulfillment-env-postgres:/tmp/seed_test_data.sql
