@@ -30,6 +30,11 @@ import WorkerScanPage from '@/pages/worker/WorkerScanPage.vue'
 import WorkerCargoItemsPage from '@/pages/worker/WorkerCargoItemsPage.vue'
 import WorkerProfilePage from '@/pages/worker/WorkerProfilePage.vue'
 
+import AdminLayout from '@/layouts/AdminLayout.vue'
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage.vue'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage.vue'
+import AdminWarehousesPage from '@/pages/admin/AdminWarehousesPage.vue'
+
 import CargoItemDetailsPage from '@/pages/cargo/CargoItemDetailsPage.vue'
 import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
 import { getAccessToken, getCurrentUser } from '@/shared/api/http'
@@ -45,9 +50,19 @@ const routes = [
     ],
   },
   {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { requiresAuth: true, roles: ['admin'] },
+    children: [
+      { path: '', name: 'admin-dashboard', component: AdminDashboardPage },
+      { path: 'users', name: 'admin-users', component: AdminUsersPage },
+      { path: 'warehouses', name: 'admin-warehouses', component: AdminWarehousesPage },
+    ],
+  },
+  {
     path: '/client',
     component: ClientLayout,
-    meta: { requiresAuth: true, roles: ['client'] },
+    meta: { requiresAuth: true, roles: ['client', 'admin'] },
     children: [
       { path: '', name: 'client-dashboard', component: ClientDashboardPage },
       { path: 'orders', name: 'client-orders', component: ClientOrdersPage },
@@ -123,8 +138,10 @@ const router = createRouter({
 })
 
 function homeForRole(role) {
+  if (role === 'admin') return '/admin'
   if (role === 'worker' || role === 'warehouse_worker') return '/worker'
-  if (role === 'logist' || role === 'admin') return '/logist'
+  if (role === 'logist' || role === 'logistician') return '/logist'
+
   return '/client'
 }
 
@@ -139,7 +156,7 @@ router.beforeEach((to) => {
   const allowed = to.meta.roles
 
   if (allowed?.length) {
-    const role = getCurrentUser()?.role
+    const role = String(getCurrentUser()?.role || '').toLowerCase()
 
     if (role && !allowed.includes(role)) {
       return homeForRole(role)
