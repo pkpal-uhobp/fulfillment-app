@@ -15,6 +15,7 @@ import (
 
 func (h *UsersHTTPHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
+
 	actor, err := core_http_middleware.CurrentUserFromContext(r.Context())
 	if err != nil {
 		response.ErrorResponse(err, "get current user")
@@ -26,16 +27,19 @@ func (h *UsersHTTPHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		response.ErrorResponse(err, "invalid is_active")
 		return
 	}
+
 	isBlocked, err := queryBoolPtr(r, "is_blocked")
 	if err != nil {
 		response.ErrorResponse(err, "invalid is_blocked")
 		return
 	}
+
 	page, err := queryInt(r, "page")
 	if err != nil {
 		response.ErrorResponse(err, "invalid page")
 		return
 	}
+
 	limit, err := queryInt(r, "limit")
 	if err != nil {
 		response.ErrorResponse(err, "invalid limit")
@@ -58,11 +62,13 @@ func (h *UsersHTTPHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		response.ErrorResponse(err, "list users")
 		return
 	}
+
 	response.JSONResponse(UsersResponse{Users: users}, http.StatusOK)
 }
 
 func (h *UsersHTTPHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
+
 	actor, err := core_http_middleware.CurrentUserFromContext(r.Context())
 	if err != nil {
 		response.ErrorResponse(err, "get current user")
@@ -90,16 +96,19 @@ func (h *UsersHTTPHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		response.ErrorResponse(err, "create user")
 		return
 	}
+
 	response.JSONResponse(UserResponse{User: user}, http.StatusCreated)
 }
 
 func (h *UsersHTTPHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
+
 	actor, err := core_http_middleware.CurrentUserFromContext(r.Context())
 	if err != nil {
 		response.ErrorResponse(err, "get current user")
 		return
 	}
+
 	userID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid user id")
@@ -118,6 +127,8 @@ func (h *UsersHTTPHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		actor.Role,
 		userID,
 		users_service.PatchUserInput{
+			Email:     request.Email,
+			Password:  request.Password,
 			FullName:  request.FullName,
 			Phone:     request.Phone,
 			Role:      request.Role,
@@ -129,16 +140,19 @@ func (h *UsersHTTPHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		response.ErrorResponse(err, "patch user")
 		return
 	}
+
 	response.JSONResponse(UserResponse{User: user}, http.StatusOK)
 }
 
 func (h *UsersHTTPHandler) BlockUser(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
+
 	actor, err := core_http_middleware.CurrentUserFromContext(r.Context())
 	if err != nil {
 		response.ErrorResponse(err, "get current user")
 		return
 	}
+
 	userID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid user id")
@@ -163,16 +177,19 @@ func (h *UsersHTTPHandler) BlockUser(w http.ResponseWriter, r *http.Request) {
 		response.ErrorResponse(err, "block user")
 		return
 	}
+
 	response.NoContentResponse()
 }
 
 func (h *UsersHTTPHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	response := core_http_response.NewHTTPResponseHandler(h.log, w)
+
 	actor, err := core_http_middleware.CurrentUserFromContext(r.Context())
 	if err != nil {
 		response.ErrorResponse(err, "get current user")
 		return
 	}
+
 	userID, err := core_http_utils.PathInt64(r, "id")
 	if err != nil {
 		response.ErrorResponse(err, "invalid user id")
@@ -188,6 +205,7 @@ func (h *UsersHTTPHandler) DeactivateUser(w http.ResponseWriter, r *http.Request
 		response.ErrorResponse(err, "deactivate user")
 		return
 	}
+
 	response.NoContentResponse()
 }
 
@@ -196,10 +214,12 @@ func queryBoolPtr(r *http.Request, name string) (*bool, error) {
 	if value == "" {
 		return nil, nil
 	}
+
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid query param %s", core_errors.ErrInvalidArgument, name)
 	}
+
 	return &parsed, nil
 }
 
@@ -211,5 +231,6 @@ func queryInt(r *http.Request, name string) (int, error) {
 	if value == nil {
 		return 0, nil
 	}
+
 	return int(*value), nil
 }

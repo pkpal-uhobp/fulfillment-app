@@ -11,6 +11,8 @@ type CreateUserRequest struct {
 }
 
 type PatchUserRequest struct {
+	Email     *string `json:"email,omitempty" validate:"omitempty,email"`
+	Password  *string `json:"password,omitempty" validate:"omitempty,min=6"`
 	FullName  *string `json:"full_name,omitempty" validate:"omitempty,min=2,max=255"`
 	Phone     *string `json:"phone,omitempty" validate:"omitempty,min=10,max=16"`
 	Role      *string `json:"role,omitempty"`

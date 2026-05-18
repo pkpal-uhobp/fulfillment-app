@@ -3,6 +3,7 @@ package users_service
 import (
 	"context"
 	"fmt"
+	"net/mail"
 	"strings"
 
 	core_domain "github.com/pkpal-uhobp/fulfillment-app/internal/core/domain"
@@ -24,6 +25,35 @@ func (s *UsersService) PatchUser(
 	}
 
 	var patch core_domain.UserPatch
+
+	if input.Email != nil {
+		value := strings.ToLower(strings.TrimSpace(*input.Email))
+		if value == "" {
+			return UserDTO{}, fmt.Errorf("%w: email is required", core_errors.ErrInvalidArgument)
+		}
+		if strings.Contains(value, " ") {
+			return UserDTO{}, fmt.Errorf("%w: invalid email", core_errors.ErrInvalidArgument)
+		}
+		if _, err := mail.ParseAddress(value); err != nil {
+			return UserDTO{}, fmt.Errorf("%w: invalid email", core_errors.ErrInvalidArgument)
+		}
+		patch.Email = &value
+	}
+
+	if input.Password != nil {
+		value := strings.TrimSpace(*input.Password)
+		if value != "" {
+			if len([]rune(value)) < 6 {
+				return UserDTO{}, fmt.Errorf("%w: password is too short", core_errors.ErrInvalidArgument)
+			}
+			passwordHash, err := hashPassword(value)
+			if err != nil {
+				return UserDTO{}, fmt.Errorf("hash password: %w", err)
+			}
+			patch.PasswordHash = &passwordHash
+		}
+	}
+
 	if input.FullName != nil {
 		value := strings.TrimSpace(*input.FullName)
 		if value == "" {
@@ -31,6 +61,7 @@ func (s *UsersService) PatchUser(
 		}
 		patch.FullName = &value
 	}
+
 	if input.Phone != nil {
 		patch.PhoneProvided = true
 		value := strings.TrimSpace(*input.Phone)
@@ -38,6 +69,7 @@ func (s *UsersService) PatchUser(
 			patch.Phone = &value
 		}
 	}
+
 	if input.Role != nil {
 		role, err := validateRole(*input.Role)
 		if err != nil {
@@ -48,12 +80,14 @@ func (s *UsersService) PatchUser(
 		}
 		patch.Role = &role
 	}
+
 	if input.IsActive != nil {
 		if userID == actorID && !*input.IsActive {
 			return UserDTO{}, fmt.Errorf("%w: cannot deactivate yourself", core_errors.ErrForbidden)
 		}
 		patch.IsActive = input.IsActive
 	}
+
 	if input.IsBlocked != nil {
 		if userID == actorID && *input.IsBlocked {
 			return UserDTO{}, fmt.Errorf("%w: cannot block yourself", core_errors.ErrForbidden)
@@ -65,5 +99,6 @@ func (s *UsersService) PatchUser(
 	if err != nil {
 		return UserDTO{}, err
 	}
+
 	return toUserDTO(updated), nil
 }

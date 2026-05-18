@@ -28,6 +28,8 @@ type CreateUserInput struct {
 }
 
 type PatchUserInput struct {
+	Email     *string
+	Password  *string
 	FullName  *string
 	Phone     *string
 	Role      *string

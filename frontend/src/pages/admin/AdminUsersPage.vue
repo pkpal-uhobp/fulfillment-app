@@ -1,19 +1,34 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+
 import { apiFetch } from '@/shared/api/http'
 
 const users = ref([])
 const loading = ref(false)
 const saving = ref(false)
+const editing = ref(false)
 const error = ref('')
 const notice = ref('')
+
 const filters = reactive({ role: 'all', search: '' })
+
 const form = reactive({
   email: '',
   password: '',
   full_name: '',
   phone: '',
   role: 'client',
+})
+
+const editForm = reactive({
+  id: null,
+  email: '',
+  password: '',
+  full_name: '',
+  phone: '',
+  role: 'client',
+  is_active: true,
+  is_blocked: false,
 })
 
 const roles = [
@@ -27,7 +42,6 @@ const roleLabels = Object.fromEntries(roles.map((role) => [role.value, role.labe
 
 function collection(payload) {
   if (Array.isArray(payload)) return payload
-
   return payload?.users || payload?.items || payload?.data || []
 }
 
@@ -37,7 +51,6 @@ const filteredUsers = computed(() => {
   return users.value.filter((user) => {
     const roleOk = filters.role === 'all' || user.role === filters.role
     const text = [user.full_name, user.email, user.phone, user.role, user.id].join(' ').toLowerCase()
-
     return roleOk && (!query || text.includes(query))
   })
 })
@@ -55,6 +68,42 @@ function resetForm() {
   form.full_name = ''
   form.phone = ''
   form.role = 'client'
+}
+
+function openEdit(user) {
+  error.value = ''
+  notice.value = ''
+  editForm.id = user.id
+  editForm.email = user.email || ''
+  editForm.password = ''
+  editForm.full_name = user.full_name || ''
+  editForm.phone = user.phone || ''
+  editForm.role = user.role || 'client'
+  editForm.is_active = Boolean(user.is_active)
+  editForm.is_blocked = Boolean(user.is_blocked)
+  editing.value = true
+}
+
+function closeEdit() {
+  editing.value = false
+  editForm.id = null
+  editForm.password = ''
+}
+
+function editPayload() {
+  const payload = {
+    email: editForm.email,
+    full_name: editForm.full_name,
+    phone: editForm.phone || '',
+    role: editForm.role,
+    is_active: Boolean(editForm.is_active),
+    is_blocked: Boolean(editForm.is_blocked),
+  }
+
+  const password = editForm.password.trim()
+  if (password) payload.password = password
+
+  return payload
 }
 
 async function loadUsers() {
@@ -99,6 +148,30 @@ async function createUser() {
   }
 }
 
+async function saveUser() {
+  if (!editForm.id) return
+
+  saving.value = true
+  error.value = ''
+  notice.value = ''
+
+  try {
+    await apiFetch(`/users/${editForm.id}`, {
+      method: 'PATCH',
+      auth: true,
+      body: editPayload(),
+    })
+
+    notice.value = 'Данные пользователя сохранены'
+    closeEdit()
+    await loadUsers()
+  } catch (err) {
+    error.value = err.message || 'Не удалось сохранить пользователя'
+  } finally {
+    saving.value = false
+  }
+}
+
 async function patchUser(user, patch) {
   error.value = ''
   notice.value = ''
@@ -117,8 +190,8 @@ async function patchUser(user, patch) {
   }
 }
 
-async function deleteUser(user) {
-  if (!confirm(`Удалить пользователя ${user.email}?`)) return
+async function deactivateUser(user) {
+  if (!confirm(`Деактивировать пользователя ${user.email}?`)) return
 
   error.value = ''
   notice.value = ''
@@ -129,10 +202,10 @@ async function deleteUser(user) {
       auth: true,
     })
 
-    notice.value = 'Пользователь удалён'
+    notice.value = 'Пользователь деактивирован'
     await loadUsers()
   } catch (err) {
-    error.value = err.message || 'Не удалось удалить пользователя'
+    error.value = err.message || 'Не удалось деактивировать пользователя'
   }
 }
 
@@ -145,7 +218,7 @@ onMounted(loadUsers)
       <div>
         <p class="eyebrow">Пользователи</p>
         <h1>Аккаунты и роли</h1>
-        <span>Создавайте сотрудников, назначайте роли и блокируйте доступ без изменения кода.</span>
+        <span>Создавайте пользователей и полностью редактируйте ФИО, email, телефон, пароль, роль и статус доступа.</span>
       </div>
 
       <button class="dark-btn" type="button" :disabled="loading" @click="loadUsers">
@@ -183,37 +256,39 @@ onMounted(loadUsers)
         <p class="eyebrow">Новый аккаунт</p>
         <h2>Создать пользователя</h2>
 
-        <label>
-          <span>ФИО</span>
-          <input v-model.trim="form.full_name" required type="text" placeholder="Иванов Иван" />
-        </label>
+        <div class="form-grid">
+          <label>
+            <span>ФИО</span>
+            <input v-model.trim="form.full_name" required type="text" placeholder="Иванов Иван" />
+          </label>
 
-        <label>
-          <span>Email</span>
-          <input v-model.trim="form.email" required type="email" placeholder="user@example.com" />
-        </label>
+          <label>
+            <span>Email</span>
+            <input v-model.trim="form.email" required type="email" placeholder="user@example.com" />
+          </label>
 
-        <label>
-          <span>Телефон</span>
-          <input v-model.trim="form.phone" type="tel" placeholder="+7..." />
-        </label>
+          <label>
+            <span>Телефон</span>
+            <input v-model.trim="form.phone" type="tel" placeholder="+7..." />
+          </label>
 
-        <label>
-          <span>Пароль</span>
-          <input v-model="form.password" required minlength="6" type="password" placeholder="минимум 6 символов" />
-        </label>
+          <label>
+            <span>Пароль</span>
+            <input v-model="form.password" required minlength="6" type="password" placeholder="минимум 6 символов" />
+          </label>
 
-        <label>
-          <span>Роль</span>
-          <select v-model="form.role">
-            <option v-for="role in roles" :key="role.value" :value="role.value">
-              {{ role.label }}
-            </option>
-          </select>
-        </label>
+          <label>
+            <span>Роль</span>
+            <select v-model="form.role">
+              <option v-for="role in roles" :key="role.value" :value="role.value">
+                {{ role.label }}
+              </option>
+            </select>
+          </label>
+        </div>
 
         <button class="red-btn" type="submit" :disabled="saving">
-          {{ saving ? 'Создаём…' : 'Создать' }}
+          {{ saving ? 'Сохраняем…' : 'Создать' }}
         </button>
       </form>
 
@@ -246,21 +321,24 @@ onMounted(loadUsers)
 
         <div v-else class="users-list">
           <article v-for="user in filteredUsers" :key="user.id" class="user-row">
-            <div>
+            <div class="user-info">
               <strong>{{ user.full_name || 'Без имени' }}</strong>
               <span>{{ user.email }}</span>
               <small v-if="user.phone">{{ user.phone }}</small>
             </div>
 
-            <em>{{ roleLabels[user.role] || user.role }}</em>
-
-            <select :value="user.role" @change="patchUser(user, { role: $event.target.value })">
-              <option v-for="role in roles" :key="role.value" :value="role.value">
-                {{ role.label }}
-              </option>
-            </select>
+            <div class="badges">
+              <em>{{ roleLabels[user.role] || user.role }}</em>
+              <b :class="{ off: !user.is_active || user.is_blocked }">
+                {{ user.is_blocked ? 'Заблокирован' : user.is_active ? 'Активен' : 'Неактивен' }}
+              </b>
+            </div>
 
             <div class="user-actions">
+              <button type="button" class="small-btn primary" @click="openEdit(user)">
+                Редактировать
+              </button>
+
               <button
                 type="button"
                 class="small-btn"
@@ -270,22 +348,85 @@ onMounted(loadUsers)
                 {{ user.is_blocked ? 'Разблокировать' : 'Заблокировать' }}
               </button>
 
-              <button
-                type="button"
-                class="small-btn"
-                @click="patchUser(user, { is_active: !user.is_active })"
-              >
-                {{ user.is_active ? 'Деактивировать' : 'Активировать' }}
-              </button>
-
-              <button type="button" class="small-btn danger" @click="deleteUser(user)">
-                Удалить
+              <button type="button" class="small-btn danger" @click="deactivateUser(user)">
+                Деактивировать
               </button>
             </div>
           </article>
         </div>
       </section>
     </section>
+
+    <teleport to="body">
+      <div v-if="editing" class="modal-backdrop" @click.self="closeEdit">
+        <form class="edit-modal" @submit.prevent="saveUser">
+          <div class="modal-head">
+            <div>
+              <p class="eyebrow">Редактирование</p>
+              <h2>Все данные пользователя</h2>
+            </div>
+            <button type="button" class="icon-btn" @click="closeEdit">×</button>
+          </div>
+
+          <div class="edit-grid">
+            <label>
+              <span>ID</span>
+              <input :value="editForm.id" disabled type="text" />
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input v-model.trim="editForm.email" required type="email" placeholder="user@example.com" />
+            </label>
+
+            <label>
+              <span>ФИО</span>
+              <input v-model.trim="editForm.full_name" required type="text" placeholder="Иванов Иван" />
+            </label>
+
+            <label>
+              <span>Телефон</span>
+              <input v-model.trim="editForm.phone" type="tel" placeholder="+7..." />
+            </label>
+
+            <label>
+              <span>Новый пароль</span>
+              <input v-model="editForm.password" minlength="6" type="password" placeholder="оставь пустым, если не менять" />
+            </label>
+
+            <label>
+              <span>Роль</span>
+              <select v-model="editForm.role">
+                <option v-for="role in roles" :key="role.value" :value="role.value">
+                  {{ role.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="switches">
+            <label class="switch-card">
+              <input v-model="editForm.is_active" type="checkbox" />
+              <span></span>
+              <strong>Активный аккаунт</strong>
+            </label>
+
+            <label class="switch-card">
+              <input v-model="editForm.is_blocked" type="checkbox" />
+              <span></span>
+              <strong>Заблокирован</strong>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button class="ghost-btn" type="button" @click="closeEdit">Отмена</button>
+            <button class="red-btn" type="submit" :disabled="saving">
+              {{ saving ? 'Сохраняем…' : 'Сохранить всё' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </teleport>
   </section>
 </template>
 
@@ -297,7 +438,8 @@ onMounted(loadUsers)
 
 .hero-card,
 .panel-card,
-.stats-grid article {
+.stats-grid article,
+.edit-modal {
   background: #fff;
   border-radius: 34px;
   box-shadow: 0 18px 62px rgba(15, 23, 42, .08);
@@ -348,7 +490,9 @@ h2 {
 
 .dark-btn,
 .red-btn,
-.small-btn {
+.ghost-btn,
+.small-btn,
+.icon-btn {
   border: 0;
   border-radius: 20px;
   font-weight: 950;
@@ -356,20 +500,35 @@ h2 {
 }
 
 .dark-btn,
-.red-btn {
+.red-btn,
+.ghost-btn {
   min-height: 58px;
   padding: 0 24px;
-  color: #fff;
   font-size: 16px;
 }
 
-.dark-btn {
+.dark-btn,
+.small-btn,
+.icon-btn {
   background: #061126;
+  color: #fff;
+}
+
+.ghost-btn {
+  background: #edf3fb;
+  color: #061126;
 }
 
 .red-btn {
   background: #ff3f4d;
-  box-shadow: 0 18px 42px rgba(255, 63, 77, .22);
+  color: #fff;
+  box-shadow: 0 16px 32px rgba(255, 63, 77, .22);
+}
+
+.dark-btn:disabled,
+.red-btn:disabled {
+  opacity: .65;
+  cursor: wait;
 }
 
 .alert,
@@ -385,8 +544,8 @@ h2 {
 }
 
 .alert.success {
-  background: #e8fff5;
-  color: #047857;
+  background: #ecfdf3;
+  color: #166534;
 }
 
 .stats-grid {
@@ -420,9 +579,9 @@ label span {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(320px, .62fr) minmax(0, 1.38fr);
+  grid-template-columns: 1fr;
   gap: 22px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .panel-card {
@@ -430,9 +589,22 @@ label span {
 }
 
 .form-card,
-.filters-row {
+.filters-row,
+.form-grid,
+.edit-grid {
   display: grid;
   gap: 14px;
+}
+
+.form-grid,
+.edit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-card .red-btn {
+  justify-self: start;
+  min-width: 260px;
+  margin-top: 4px;
 }
 
 label {
@@ -443,16 +615,21 @@ label {
 input,
 select {
   width: 100%;
-  min-height: 54px;
+  min-height: 56px;
   border: 1px solid #dbe4ef;
-  border-radius: 18px;
+  border-radius: 20px;
   background: #f8fbff;
   color: #061126;
-  padding: 0 16px;
+  padding: 0 18px;
   font-size: 16px;
   font-weight: 850;
   outline: none;
   box-sizing: border-box;
+}
+
+input:disabled {
+  opacity: .7;
+  cursor: not-allowed;
 }
 
 input:focus,
@@ -460,6 +637,41 @@ select:focus {
   border-color: #ff3f4d;
   box-shadow: 0 0 0 5px rgba(255, 63, 77, .12);
   background: #fff;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 54px;
+  background-color: #f8fbff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #061126 50%),
+    linear-gradient(135deg, #061126 50%, transparent 50%),
+    linear-gradient(135deg, rgba(255, 63, 77, .10), rgba(219, 234, 254, .55));
+  background-position:
+    calc(100% - 24px) 50%,
+    calc(100% - 17px) 50%,
+    100% 0;
+  background-size: 7px 7px, 7px 7px, 56px 100%;
+  background-repeat: no-repeat;
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease, transform .18s ease;
+}
+
+select:hover {
+  border-color: rgba(255, 63, 77, .45);
+  background-color: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+}
+
+select option {
+  color: #061126;
+  background: #fff;
+  font-weight: 850;
+}
+
+.list-card {
+  overflow: hidden;
 }
 
 .list-head {
@@ -471,26 +683,26 @@ select:focus {
 }
 
 .filters-row {
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   margin-bottom: 18px;
 }
 
 .users-list {
   display: grid;
   gap: 12px;
-  max-height: 620px;
+  max-height: 720px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 6px;
+  padding-right: 10px;
 }
 
 .user-row {
   border-radius: 24px;
   background: #f6f9fd;
-  padding: 16px;
+  padding: 18px;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(170px, 220px) minmax(260px, auto);
-  gap: 12px;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(200px, .8fr) minmax(360px, auto);
+  gap: 14px;
   align-items: center;
   min-width: 0;
 }
@@ -518,21 +730,44 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
-em {
+.badges {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  align-content: center;
+}
+
+em,
+.badges b {
   border-radius: 999px;
   padding: 10px 14px;
-  background: #dbeafe;
-  color: #1d4ed8;
   font-style: normal;
   font-weight: 950;
   white-space: nowrap;
 }
 
+em {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badges b {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badges b.off {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
 .small-btn {
   min-height: 46px;
   padding: 0 14px;
-  background: #061126;
-  color: #fff;
+}
+
+.small-btn.primary {
+  background: #2563eb;
 }
 
 .small-btn.danger {
@@ -545,35 +780,133 @@ em {
   color: #64748b;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(6, 17, 38, .46);
+  backdrop-filter: blur(8px);
+}
+
+.edit-modal {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.modal-head,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-head {
+  margin-bottom: 22px;
+}
+
+.icon-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.switches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.switch-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: #f6f9fd;
+  cursor: pointer;
+}
+
+.switch-card input {
+  display: none;
+}
+
+.switch-card span {
+  width: 54px;
+  height: 32px;
+  border-radius: 999px;
+  background: #dbe4ef;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.switch-card span::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .2);
+  transition: transform .18s ease;
+}
+
+.switch-card input:checked + span {
+  background: #ff3f4d;
+}
+
+.switch-card input:checked + span::after {
+  transform: translateX(22px);
+}
+
+.switch-card strong {
+  color: #061126;
+  font-weight: 950;
+}
+
+.modal-actions {
+  margin-top: 22px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1280px) {
-  .workspace-grid,
   .stats-grid,
-  .filters-row {
+  .filters-row,
+  .form-grid,
+  .edit-grid,
+  .switches {
     grid-template-columns: 1fr;
   }
 
   .user-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 
   .user-actions {
-    grid-column: 1 / -1;
     justify-content: flex-start;
   }
 }
 
 @media (max-width: 760px) {
-  .hero-card {
+  .hero-card,
+  .modal-head,
+  .modal-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .user-row {
-    grid-template-columns: 1fr;
-  }
-
-  .user-actions {
-    grid-column: auto;
+  .form-card .red-btn {
+    width: 100%;
   }
 }
 </style>

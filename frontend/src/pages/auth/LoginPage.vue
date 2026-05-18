@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+
 import { ArrowLeft, ArrowRight, LockKeyhole, Mail } from '@lucide/vue'
 
 import AuthIllustration from '@/shared/ui/AuthIllustration.vue'
@@ -24,7 +25,6 @@ function validateField(field) {
 function validateForm() {
   touched.email = true
   touched.password = true
-
   validateField('email')
   validateField('password')
   errors.common = ''
@@ -35,8 +35,9 @@ function validateForm() {
 function redirectByRole(user) {
   const role = String(user?.role || '').toLowerCase()
 
-  if (role === 'logist' || role === 'admin') return router.push('/logist')
-  if (role === 'worker') return router.push('/worker')
+  if (role === 'admin') return router.push('/admin')
+  if (role === 'logist' || role === 'logistician') return router.push('/logist')
+  if (role === 'worker' || role === 'warehouse_worker') return router.push('/worker')
 
   return router.push('/client')
 }
@@ -83,7 +84,6 @@ async function submit() {
       <section class="flex min-h-0 items-center justify-center overflow-y-auto px-5 py-6 sm:px-8 lg:px-10 lg:py-6 xl:px-14">
         <form novalidate class="w-full max-w-2xl" @submit.prevent="submit">
           <p class="text-[12px] font-black uppercase tracking-[0.42em] text-[#ff3f4b] sm:text-[13px]">Аккаунт</p>
-
           <h1 class="mt-3 text-4xl font-black tracking-tight sm:text-5xl xl:text-6xl">Войти</h1>
 
           <p class="mt-3 max-w-xl text-base font-medium leading-7 text-slate-600 xl:text-lg">
@@ -93,7 +93,6 @@ async function submit() {
           <div class="mt-6 space-y-4 xl:mt-7 xl:space-y-5">
             <label class="block">
               <span class="mb-2 block text-[12px] font-black uppercase tracking-[0.35em] text-slate-500 sm:text-[13px]">Email</span>
-
               <div :class="['flex items-center gap-4 rounded-3xl border bg-slate-50 px-5 py-3.5 transition xl:px-6 xl:py-4', errors.email && touched.email ? 'border-[#ff3f4b] ring-4 ring-red-100' : 'border-slate-200 focus-within:border-[#ff3f4b] focus-within:ring-4 focus-within:ring-red-100']">
                 <Mail class="h-5 w-5 shrink-0 text-slate-400 xl:h-6 xl:w-6" />
                 <input
@@ -106,13 +105,11 @@ async function submit() {
                   @input="validateField('email')"
                 />
               </div>
-
               <p v-if="errors.email && touched.email" class="mt-2 rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600">{{ errors.email }}</p>
             </label>
 
             <label class="block">
               <span class="mb-2 block text-[12px] font-black uppercase tracking-[0.35em] text-slate-500 sm:text-[13px]">Пароль</span>
-
               <div :class="['flex items-center gap-4 rounded-3xl border bg-slate-50 px-5 py-3.5 transition xl:px-6 xl:py-4', errors.password && touched.password ? 'border-[#ff3f4b] ring-4 ring-red-100' : 'border-slate-200 focus-within:border-[#ff3f4b] focus-within:ring-4 focus-within:ring-red-100']">
                 <LockKeyhole class="h-5 w-5 shrink-0 text-slate-400 xl:h-6 xl:w-6" />
                 <input
@@ -125,21 +122,24 @@ async function submit() {
                   @input="validateField('password')"
                 />
               </div>
-
               <p v-if="errors.password && touched.password" class="mt-2 rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600">{{ errors.password }}</p>
             </label>
           </div>
 
           <div v-if="errors.common" class="mt-4 rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold leading-6 text-red-700 xl:mt-5 xl:text-base xl:leading-7">{{ errors.common }}</div>
 
-          <button type="submit" :disabled="isSubmitting" class="mt-6 flex w-full items-center justify-center gap-4 rounded-3xl bg-[#ff3f4b] px-7 py-4 text-lg font-black text-white shadow-2xl shadow-red-500/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 xl:mt-7 xl:px-8 xl:py-5 xl:text-xl">
-            {{ isSubmitting ? 'Входим...' : 'Войти в аккаунт' }}
-            <ArrowRight class="h-6 w-6" />
+          <button
+            type="submit"
+            :disabled="isSubmitting || !isValid"
+            class="mt-6 inline-flex min-h-[64px] w-full items-center justify-center gap-3 rounded-3xl bg-[#ff3f4b] px-6 text-lg font-black text-white shadow-[0_20px_45px_rgba(255,63,75,0.28)] transition hover:-translate-y-0.5 hover:bg-[#f12f3c] disabled:cursor-not-allowed disabled:opacity-60 xl:mt-7 xl:min-h-[72px] xl:text-xl"
+          >
+            {{ isSubmitting ? 'Входим…' : 'Войти' }}
+            <ArrowRight class="h-5 w-5 xl:h-6 xl:w-6" />
           </button>
 
-          <p class="mt-5 text-center text-base font-semibold text-slate-500 xl:mt-6">
+          <p class="mt-5 text-center text-sm font-bold text-slate-500 xl:text-base">
             Нет аккаунта?
-            <RouterLink to="/register" class="font-black text-[#ff3f4b] hover:underline">Зарегистрироваться</RouterLink>
+            <RouterLink to="/register" class="text-[#ff3f4b] hover:underline">Зарегистрироваться</RouterLink>
           </p>
         </form>
       </section>

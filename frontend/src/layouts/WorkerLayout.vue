@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { clearAuth, getCurrentUser } from '@/shared/api/http'
 
@@ -15,8 +15,24 @@ const navItems = [
   { to: '/worker/cargo-items', label: 'Грузовые места', icon: '▤' },
 ]
 
+const roleLabels = {
+  admin: 'Администратор',
+  client: 'Клиент',
+  logist: 'Логист',
+  logistician: 'Логист',
+  worker: 'Рабочий',
+  warehouse_worker: 'Рабочий',
+}
+
+const displayName = computed(() => user.value?.full_name || user.value?.email || 'Рабочий склада')
+
+const roleLabel = computed(() => {
+  const role = String(user.value?.role || '').toLowerCase()
+  return roleLabels[role] || 'Рабочий'
+})
+
 const initials = computed(() => {
-  const source = user.value?.full_name || user.value?.email || 'Рабочий склада'
+  const source = displayName.value || user.value?.email || 'Рабочий склада'
 
   return source
     .split(/\s+/)
@@ -26,9 +42,9 @@ const initials = computed(() => {
     .slice(0, 2)
     .toUpperCase() || 'РС'
 })
+
 function isActive(item) {
   if (item.exact) return route.path === item.to
-
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
@@ -41,7 +57,14 @@ function logout() {
   router.push({ name: 'landing' })
 }
 
-onMounted(refreshMe)
+onMounted(() => {
+  refreshMe()
+  window.addEventListener('auth:changed', refreshMe)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('auth:changed', refreshMe)
+})
 </script>
 
 <template>
@@ -72,6 +95,14 @@ onMounted(refreshMe)
       </nav>
 
       <div class="worker-sidebar__bottom">
+        <div class="worker-user-card" aria-label="Текущий пользователь">
+          <span class="worker-user-card__avatar">{{ initials }}</span>
+          <span class="worker-user-card__info">
+            <strong>{{ displayName }}</strong>
+            <em>{{ roleLabel }}</em>
+          </span>
+        </div>
+
         <button type="button" class="worker-logout" @click="logout">Выйти</button>
       </div>
     </aside>
@@ -211,21 +242,76 @@ onMounted(refreshMe)
 .worker-sidebar__bottom {
   margin-top: auto;
   display: grid;
-  gap: 14px;
+  gap: 16px;
+}
+
+.worker-user-card {
+  width: 100%;
+  min-height: 92px;
+  padding: 20px;
+  border-radius: 26px;
+  background: #202b3d;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03);
+}
+
+.worker-user-card__avatar {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  background: rgba(255, 63, 77, .25);
+  color: #ff6370;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -.03em;
+}
+
+.worker-user-card__info {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.worker-user-card__info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.worker-user-card__info em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #b7c1cf;
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .worker-logout {
-  min-height: 56px;
+  min-height: 68px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 24px;
   background: #202b3d;
   color: #fff;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 950;
   cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
 }
+
 .worker-logout:hover {
   background: #ff3f4d;
+  transform: translateY(-1px);
 }
 
 .worker-main {

@@ -10,6 +10,8 @@ type UserFilter struct {
 }
 
 type UserPatch struct {
+	Email         *string
+	PasswordHash  *string
 	FullName      *string
 	PhoneProvided bool
 	Phone         *string

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+
 import { apiFetch } from '@/shared/api/http'
 
 const users = ref([])
@@ -9,30 +10,6 @@ const orders = ref([])
 const cargoItems = ref([])
 const loading = ref(false)
 const error = ref('')
-
-const panelLinks = [
-  {
-    to: '/client',
-    eyebrow: 'Клиент',
-    title: 'Панель клиента',
-    text: 'Заявки клиента, создание заявок и просмотр статусов.',
-    icon: 'КЛ',
-  },
-  {
-    to: '/logist',
-    eyebrow: 'Логист',
-    title: 'Панель логиста',
-    text: 'Заявки, календарь, склады, грузы и отгрузки.',
-    icon: 'ЛГ',
-  },
-  {
-    to: '/worker',
-    eyebrow: 'Рабочий',
-    title: 'Панель рабочего',
-    text: 'Складские операции, заявки, QR и грузовые места.',
-    icon: 'РБ',
-  },
-]
 
 function collection(payload, keys) {
   if (Array.isArray(payload)) return payload
@@ -70,6 +47,13 @@ const stats = computed(() => {
   }
 })
 
+const roleCards = computed(() => [
+  { label: 'Клиенты', value: stats.value.clients },
+  { label: 'Логисты', value: stats.value.logist },
+  { label: 'Рабочие', value: stats.value.workers },
+  { label: 'Админы', value: stats.value.admins },
+])
+
 async function loadData() {
   loading.value = true
   error.value = ''
@@ -103,8 +87,7 @@ onMounted(loadData)
         <p class="eyebrow">Админ-панель</p>
         <h1>Управление системой</h1>
         <span>
-          Здесь собраны административные функции: пользователи, склады, зоны хранения,
-          гейты и быстрый переход в панели других ролей.
+          Здесь собраны административные функции: пользователи, склады, зоны хранения и гейты.
         </span>
       </div>
 
@@ -142,54 +125,15 @@ onMounted(loadData)
     </section>
 
     <section class="dashboard-layout">
-      <article class="panel-card">
+      <article class="panel-card role-panel">
         <p class="eyebrow">Роли</p>
         <h2>Пользователи по ролям</h2>
 
         <div class="role-list">
-          <div>
-            <span>Клиенты</span>
-            <strong>{{ stats.clients }}</strong>
+          <div v-for="role in roleCards" :key="role.label">
+            <span>{{ role.label }}</span>
+            <strong>{{ role.value }}</strong>
           </div>
-
-          <div>
-            <span>Логисты</span>
-            <strong>{{ stats.logist }}</strong>
-          </div>
-
-          <div>
-            <span>Рабочие</span>
-            <strong>{{ stats.workers }}</strong>
-          </div>
-
-          <div>
-            <span>Админы</span>
-            <strong>{{ stats.admins }}</strong>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel-card panel-switches">
-        <p class="eyebrow">Переключение</p>
-        <h2>Открыть панель роли</h2>
-        <span class="panel-text">
-          Быстрый переход доступен только администратору. Карточки расположены вертикально.
-        </span>
-
-        <div class="switch-stack">
-          <RouterLink
-            v-for="panel in panelLinks"
-            :key="panel.to"
-            :to="panel.to"
-            class="switch-card"
-          >
-            <b>{{ panel.icon }}</b>
-            <span>
-              <em>{{ panel.eyebrow }}</em>
-              <strong>{{ panel.title }}</strong>
-              <small>{{ panel.text }}</small>
-            </span>
-          </RouterLink>
         </div>
       </article>
     </section>
@@ -251,22 +195,21 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(48px, 7vw, 86px);
+  font-size: clamp(48px, 7vw, 84px);
   line-height: .9;
 }
 
 h2 {
-  font-size: clamp(28px, 3vw, 42px);
-  line-height: 1;
+  font-size: clamp(34px, 4vw, 58px);
+  line-height: .95;
 }
 
 .hero-card span,
-.panel-text,
-.action-card small,
-.stats-grid small {
+.action-card small {
   display: block;
   margin-top: 14px;
   color: #5d6d83;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.55;
 }
@@ -314,8 +257,7 @@ h2 {
 }
 
 .stats-grid span,
-.role-list span,
-.switch-card em {
+.role-list span {
   color: #97a5bb;
   font-size: 13px;
   font-weight: 950;
@@ -332,103 +274,50 @@ h2 {
   letter-spacing: -.06em;
 }
 
+.stats-grid small {
+  color: #5d6d83;
+  font-weight: 800;
+}
+
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, .58fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   align-items: stretch;
 }
 
 .panel-card {
-  padding: 30px;
+  padding: 34px;
+}
+
+.role-panel {
+  width: 100%;
 }
 
 .role-list {
-  margin-top: 24px;
+  margin-top: 28px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 
 .role-list div {
-  border-radius: 22px;
+  min-height: 96px;
+  border-radius: 24px;
   background: #f6f9fd;
-  padding: 18px;
+  padding: 22px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .role-list strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 34px;
-  font-weight: 950;
-}
-
-.panel-switches {
-  display: grid;
-  align-content: start;
-}
-
-.switch-stack {
-  margin-top: 22px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.switch-card {
-  min-height: 104px;
-  border-radius: 24px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: #f6f9fd;
   color: #061126;
-  text-decoration: none;
-  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
-}
-
-.switch-card:hover {
-  transform: translateY(-2px);
-  background: #061126;
-  color: #fff;
-  box-shadow: 0 18px 44px rgba(6, 17, 38, .18);
-}
-
-.switch-card b {
-  width: 58px;
-  height: 58px;
-  border-radius: 20px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  background: #ff3f4d;
-  color: #fff;
+  font-size: clamp(34px, 4vw, 56px);
+  line-height: 1;
   font-weight: 950;
-  box-shadow: 0 14px 34px rgba(255, 63, 77, .24);
-}
-
-.switch-card span {
-  display: grid;
-  gap: 4px;
-}
-
-.switch-card strong {
-  font-size: 22px;
-  line-height: 1.05;
-  font-weight: 950;
-}
-
-.switch-card small {
-  color: #5d6d83;
-  font-size: 14px;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.switch-card:hover small,
-.switch-card:hover em {
-  color: #a9b8ca;
+  letter-spacing: -.06em;
 }
 
 .action-grid {
@@ -461,13 +350,8 @@ h2 {
 
 @media (max-width: 1180px) {
   .stats-grid,
-  .dashboard-layout,
   .action-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .dashboard-layout {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -478,9 +362,13 @@ h2 {
   }
 
   .stats-grid,
-  .action-grid,
-  .role-list {
+  .action-grid {
     grid-template-columns: 1fr;
+  }
+
+  .role-list div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .dark-btn {
