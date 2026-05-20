@@ -1,8 +1,10 @@
 const DEFAULT_API_BASE_URL = '/api/v1'
 const ME_CACHE_TTL_MS = 60_000
+const TOKEN_REFRESH_BUFFER_MS = 60_000
 
 let meRequestPromise = null
 let meCacheTime = 0
+let refreshPromise = null
 
 function normalizeBaseUrl(value) {
   const raw = value || DEFAULT_API_BASE_URL
@@ -95,13 +97,26 @@ export function clearAuth() {
   localStorage.removeItem('current_user')
   meRequestPromise = null
   meCacheTime = 0
+  refreshPromise = null
   notifyAuthChanged()
 }
 
-function isTokenExpired(token) {
+function isTokenExpired(token, bufferMs = 0) {
   const payload = parseJwtPayload(token)
   if (!payload?.exp) return false
-  return Number(payload.exp) * 1000 <= Date.now()
+  return Number(payload.exp) * 1000 <= Date.now() + bufferMs
+}
+
+function needsAccessTokenRefresh(token = getAccessToken()) {
+  if (!token) return true
+  return isTokenExpired(token, TOKEN_REFRESH_BUFFER_MS)
+}
+
+function isAuthEndpoint(path) {
+  const normalized = String(path || '').replace(/^https?:\/\/[^/]+/i, '')
+  return ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].some((endpoint) =>
+    normalized.includes(endpoint),
+  )
 }
 
 function redirectToMainScreen() {
@@ -189,8 +204,67 @@ export function cabinetPathByRole(role) {
   return '/client'
 }
 
+async function parseResponseBody(response) {
+  const text = await response.text()
+  if (!text) return null
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text }
+  }
+}
+
+export async function refreshAccessToken() {
+  const refreshToken = getRefreshToken()
+
+  if (!refreshToken || isTokenExpired(refreshToken)) {
+    return false
+  }
+
+  if (refreshPromise) return refreshPromise
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(buildUrl('/auth/refresh'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+
+      const data = await parseResponseBody(response)
+
+      if (!response.ok) {
+        return false
+      }
+
+      saveAuth(data)
+      return Boolean(getAccessToken())
+    } catch {
+      return false
+    } finally {
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
+
+export async function ensureValidAccessToken() {
+  const currentToken = getAccessToken()
+
+  if (currentToken && !needsAccessTokenRefresh(currentToken)) {
+    return currentToken
+  }
+
+  const refreshed = await refreshAccessToken()
+  if (!refreshed) return ''
+
+  return getAccessToken()
+}
+
 export async function apiFetch(path, options = {}) {
-  const { method = 'GET', body, auth = false, headers = {} } = options
+  const { method = 'GET', body, auth = false, headers = {}, retryOnUnauthorized = true } = options
   const requestHeaders = new Headers(headers)
   let requestBody = body
 
@@ -199,10 +273,12 @@ export async function apiFetch(path, options = {}) {
     requestBody = typeof body === 'string' ? body : JSON.stringify(body)
   }
 
-  if (auth) {
-    const token = getAccessToken()
+  const requiresAuth = auth && !isAuthEndpoint(path)
 
-    if (!token || isTokenExpired(token)) {
+  if (requiresAuth) {
+    const token = await ensureValidAccessToken()
+
+    if (!token) {
       expireSessionAndGoHome()
       const error = new Error('Сессия истекла. Выполните вход снова.')
       error.status = 401
@@ -212,26 +288,33 @@ export async function apiFetch(path, options = {}) {
     requestHeaders.set('Authorization', `Bearer ${token}`)
   }
 
-  const response = await fetch(buildUrl(path), {
+  let response = await fetch(buildUrl(path), {
     method,
     headers: requestHeaders,
     body: requestBody,
   })
 
-  const text = await response.text()
-  let data = null
+  if (requiresAuth && retryOnUnauthorized && response.status === 401) {
+    const refreshed = await refreshAccessToken()
 
-  if (text) {
-    try {
-      data = JSON.parse(text)
-    } catch {
-      data = { message: text }
+    if (refreshed) {
+      requestHeaders.set('Authorization', `Bearer ${getAccessToken()}`)
+      response = await fetch(buildUrl(path), {
+        method,
+        headers: requestHeaders,
+        body: requestBody,
+      })
     }
   }
 
+  const data = await parseResponseBody(response)
+
   if (!response.ok) {
-    const tokenProblem = auth && (response.status === 401 || isTokenErrorPayload(data))
-    if (tokenProblem) expireSessionAndGoHome()
+    const tokenProblem = requiresAuth && (response.status === 401 || isTokenErrorPayload(data))
+
+    if (tokenProblem) {
+      expireSessionAndGoHome()
+    }
 
     const error = new Error(data?.error || data?.message || data?.detail || `HTTP ${response.status}`)
     error.status = response.status
@@ -254,8 +337,8 @@ export async function loadMe(options = {}) {
   if (cachedUser && freshCache && !force) return cachedUser
   if (meRequestPromise) return meRequestPromise
 
-  const token = getAccessToken()
-  if (!token || isTokenExpired(token)) return null
+  const token = await ensureValidAccessToken()
+  if (!token) return null
 
   meRequestPromise = apiFetch('/auth/me', { auth: true })
     .then((payload) => {
@@ -271,17 +354,20 @@ export async function loadMe(options = {}) {
   return meRequestPromise
 }
 
-
 // Совместимость с роутером: если где-то импортируется ensureAuthSession,
 // фронтенд не должен падать из-за отсутствующего named export.
 // Функция не спамит /auth/me: сначала берёт пользователя из localStorage/JWT,
 // а сетевой запрос делает только через loadMe(), где есть кеш и склейка запросов.
 export async function ensureAuthSession(options = {}) {
-  const token = getAccessToken()
+  const refreshToken = getRefreshToken()
 
-  if (!token) return null
+  if (!refreshToken && !getAccessToken()) {
+    return null
+  }
 
-  if (isTokenExpired(token)) {
+  const token = await ensureValidAccessToken()
+
+  if (!token) {
     expireSessionAndGoHome()
     return null
   }
