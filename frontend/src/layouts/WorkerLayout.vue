@@ -25,22 +25,17 @@ const roleLabels = {
 }
 
 const displayName = computed(() => user.value?.full_name || user.value?.email || 'Рабочий склада')
-
-const roleLabel = computed(() => {
-  const role = String(user.value?.role || '').toLowerCase()
-  return roleLabels[role] || 'Рабочий'
-})
-
+const roleLabel = computed(() => roleLabels[String(user.value?.role || '').toLowerCase()] || 'Рабочий')
 const initials = computed(() => {
-  const source = displayName.value || user.value?.email || 'Рабочий склада'
-
-  return source
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || 'РС'
+  return (
+    displayName.value
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'РС'
+  )
 })
 
 function isActive(item) {
@@ -95,14 +90,13 @@ onUnmounted(() => {
       </nav>
 
       <div class="worker-sidebar__bottom">
-        <div class="worker-user-card" aria-label="Текущий пользователь">
+        <RouterLink class="worker-user-card" to="/worker/profile" aria-label="Открыть профиль" @click="menuOpen = false">
           <span class="worker-user-card__avatar">{{ initials }}</span>
           <span class="worker-user-card__info">
             <strong>{{ displayName }}</strong>
             <em>{{ roleLabel }}</em>
           </span>
-        </div>
-
+        </RouterLink>
         <button type="button" class="worker-logout" @click="logout">Выйти</button>
       </div>
     </aside>
@@ -193,158 +187,155 @@ onUnmounted(() => {
   min-height: 64px;
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 0 18px;
-  border-radius: 0 22px 22px 0;
-  color: #aeb9c8;
+  gap: 14px;
+  padding: 0 16px;
+  border-radius: 22px;
+  color: rgba(255, 255, 255, .72);
   text-decoration: none;
   font-size: 18px;
   font-weight: 950;
-  transition: background .18s ease, color .18s ease, transform .18s ease;
-  outline: none;
+  transition: background .16s ease, color .16s ease, transform .16s ease;
 }
 
-.worker-nav__item::before {
-  content: '';
-  position: absolute;
-  left: -28px;
-  top: 12px;
-  bottom: 12px;
-  width: 5px;
-  border-radius: 999px;
-  background: transparent;
-}
-
-.worker-nav__item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, .06);
-  transform: translateX(2px);
-}
-
+.worker-nav__item:hover,
 .worker-nav__item.active {
+  background: rgba(255, 255, 255, .1);
   color: #fff;
-  background: #202b3d;
-  box-shadow: none;
+  transform: translateX(4px);
 }
 
 .worker-nav__item.active::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 16px;
+  bottom: 16px;
+  width: 5px;
+  border-radius: 999px;
   background: #ff3f4d;
-  box-shadow: 0 0 0 5px rgba(255, 63, 77, .12);
 }
 
 .worker-nav__item i {
-  width: 24px;
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
   font-style: normal;
-  color: inherit;
 }
 
 .worker-sidebar__bottom {
   margin-top: auto;
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .worker-user-card {
-  width: 100%;
-  min-height: 92px;
-  padding: 20px;
-  border-radius: 26px;
-  background: #202b3d;
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, .08);
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03);
+  gap: 12px;
+  color: #fff;
+  text-decoration: none;
+  transition: background .16s ease, transform .16s ease;
+}
+
+.worker-user-card:hover {
+  background: rgba(255, 255, 255, .14);
+  transform: translateY(-1px);
 }
 
 .worker-user-card__avatar {
-  width: 56px;
-  height: 56px;
-  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
   border-radius: 16px;
-  background: rgba(255, 63, 77, .25);
-  color: #ff6370;
+  background: #fff;
+  color: #061126;
   display: grid;
   place-items: center;
-  font-size: 20px;
   font-weight: 950;
-  letter-spacing: -.03em;
 }
 
 .worker-user-card__info {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
-.worker-user-card__info strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 950;
-  line-height: 1.1;
-}
-
+.worker-user-card__info strong,
 .worker-user-card__info em {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #b7c1cf;
+}
+
+.worker-user-card__info em {
+  color: #ff9ca5;
   font-style: normal;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
 
 .worker-logout {
-  min-height: 68px;
+  min-height: 52px;
   border: 0;
-  border-radius: 24px;
-  background: #202b3d;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .1);
   color: #fff;
-  font-size: 18px;
   font-weight: 950;
   cursor: pointer;
-  transition: background .18s ease, transform .18s ease;
-}
-
-.worker-logout:hover {
-  background: #ff3f4d;
-  transform: translateY(-1px);
 }
 
 .worker-main {
   min-width: 0;
-  padding: 34px;
+  padding: 36px;
 }
 
-.worker-mobile-head,
+.worker-mobile-head {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  border-radius: 24px;
+  padding: 14px;
+  background: #fff;
+  box-shadow: 0 14px 44px rgba(15, 23, 42, .08);
+}
+
+.worker-mobile-head button,
+.worker-mobile-head span {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: #eef3f9;
+  color: #061126;
+  font-weight: 950;
+}
+
 .worker-backdrop {
   display: none;
 }
 
-.worker-mobile-head span {
-  width: 46px;
-  height: 46px;
-  border-radius: 15px;
-  background: #ff3f4d;
-  display: grid;
-  place-items: center;
-  font-weight: 950;
-}
-
 @media (max-width: 980px) {
   .worker-shell {
-    display: block;
+    grid-template-columns: 1fr;
   }
 
   .worker-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
     width: min(320px, 88vw);
-    transform: translateX(-105%);
-    transition: transform .22s ease;
+    transform: translateX(-110%);
+    transition: transform .18s ease;
   }
 
   .worker-sidebar.open {
@@ -355,7 +346,7 @@ onUnmounted(() => {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(4, 10, 24, .58);
+    background: rgba(6, 17, 38, .42);
     z-index: 40;
   }
 
@@ -365,26 +356,6 @@ onUnmounted(() => {
 
   .worker-mobile-head {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 18px;
-    padding: 12px;
-    border-radius: 22px;
-    background: #071222;
-    color: #fff;
-  }
-
-  .worker-mobile-head button {
-    width: 46px;
-    height: 46px;
-    border: 0;
-    border-radius: 15px;
-    background: #ff3f4d;
-    color: #fff;
-    display: grid;
-    place-items: center;
-    font-weight: 950;
   }
 }
 </style>

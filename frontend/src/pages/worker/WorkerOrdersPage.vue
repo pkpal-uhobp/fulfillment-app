@@ -1,165 +1,310 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { apiFetch } from '@/shared/api/http'
+
 import {
   cargoTitle,
   formatDateTime,
+  gateTitle,
   normalizeCollection,
   safeFileName,
   statusLabel,
-  statusTone,
+  zoneTitle,
 } from './workerUtils'
 
 const route = useRoute()
 const router = useRouter()
 
+const orders = ref([])
 const cargoItems = ref([])
+
+const selectedStatus = ref(String(route.query.status || 'all'))
 const selectedOrderId = ref(String(route.query.order_id || ''))
-const search = ref('')
+const orderSearch = ref('')
+const orderSort = ref('updated_desc')
+
 const loading = ref(false)
-const printing = ref(false)
-const downloading = ref(false)
 const error = ref('')
 const notice = ref('')
+const printLoading = ref(false)
+const archiveLoading = ref(false)
 
-const problemStatuses = ['damaged', 'lost', 'cancelled']
+const statusOptions = [
+  { value: 'all', label: 'Все статусы' },
+  { value: 'created', label: 'Создана' },
+  { value: 'waiting_pickup', label: 'Ожидает забора' },
+  { value: 'waiting_delivery', label: 'Ожидает сдачи на склад' },
+  { value: 'received', label: 'Принята на склад' },
+  { value: 'stored', label: 'На хранении' },
+  { value: 'assigned_to_shipping', label: 'Назначена к отгрузке' },
+  { value: 'shipped', label: 'Отгружена' },
+  { value: 'delivered', label: 'Доставлена' },
+  { value: 'cancelled', label: 'Отменена' },
+]
 
-const counters = computed(() => ({
-  orders: orderCards.value.length,
-  places: cargoItems.value.length,
-  accepted: cargoItems.value.filter((item) => item.status === 'accepted').length,
-  stored: cargoItems.value.filter((item) => item.status === 'stored').length,
-  ready: cargoItems.value.filter((item) => ['ready_to_ship', 'shipped'].includes(item.status)).length,
-}))
+const sortOptions = [
+  { value: 'updated_desc', label: 'Сначала новые' },
+  { value: 'updated_asc', label: 'Сначала старые' },
+  { value: 'order_desc', label: 'Номер заявки ↓' },
+  { value: 'order_asc', label: 'Номер заявки ↑' },
+  { value: 'qr_desc', label: 'Больше QR' },
+  { value: 'qr_asc', label: 'Меньше QR' },
+]
 
-const orderCards = computed(() => {
-  const groups = new Map()
+const orderStatusLabels = {
+  created: 'Создана',
+  waiting_pickup: 'Ожидает забора',
+  waiting_delivery: 'Ожидает сдачи на склад',
+  received: 'Принята на склад',
+  pending_pickup: 'Ожидает забора',
+  pending_self_delivery: 'Ожидает сдачи',
+  accepted: 'Принята',
+  stored: 'На хранении',
+  ready_to_ship: 'К отгрузке',
+  assigned_to_shipping: 'Назначена к отгрузке',
+  assigned_to_shipment: 'Назначена к отгрузке',
+  shipped: 'Отгружена',
+  delivered: 'Доставлена',
+  cancelled: 'Отменена',
+}
+
+const orderStatusTones = {
+  created: 'gray',
+  waiting_pickup: 'amber',
+  waiting_delivery: 'amber',
+  received: 'blue',
+  pending_pickup: 'amber',
+  pending_self_delivery: 'amber',
+  accepted: 'blue',
+  stored: 'green',
+  ready_to_ship: 'violet',
+  assigned_to_shipping: 'violet',
+  assigned_to_shipment: 'violet',
+  shipped: 'dark',
+  delivered: 'green',
+  cancelled: 'gray',
+}
+
+const cargoByOrder = computed(() => {
+  const map = new Map()
 
   for (const item of cargoItems.value) {
-    const orderId = String(item.order_id || item.orderId || item.order?.id || item.orderInfo?.id || '')
+    const orderId = getCargoOrderId(item)
+    if (!orderId) continue
 
-    if (!orderId) {
-      continue
-    }
-
-    if (!groups.has(orderId)) {
-      groups.set(orderId, [])
-    }
-
-    groups.get(orderId).push(item)
+    if (!map.has(orderId)) map.set(orderId, [])
+    map.get(orderId).push(item)
   }
 
-  return Array.from(groups.entries())
-    .map(([orderId, items]) => {
-      const last = [...items].sort(
-        (a, b) =>
-          new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0) -
-          new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0),
-      )[0]
-
-      const order = last?.order || last?.order_info || last?.orderInfo || {}
-      const statuses = items.reduce((acc, item) => {
-        acc[item.status] = (acc[item.status] || 0) + 1
-        return acc
-      }, {})
-
-      const accepted = items.filter((item) => item.status === 'accepted').length
-      const stored = items.filter((item) => item.status === 'stored').length
-      const ready = items.filter((item) => ['ready_to_ship', 'shipped'].includes(item.status)).length
-      const problems = items.filter((item) => problemStatuses.includes(item.status)).length
-
-      return {
-        id: orderId,
-        status: order.status || last?.order_status || last?.orderStatus || '',
-        transferType: order.transfer_type || order.transferType || last?.transfer_type || last?.transferType || '',
-        pickupDate: order.pickup_date || order.pickupDate || last?.pickup_date || last?.pickupDate || '',
-        receivingWarehouse:
-          order.receiving_warehouse?.name ||
-          order.receivingWarehouse?.name ||
-          last?.receiving_warehouse?.name ||
-          last?.receivingWarehouse?.name ||
-          last?.receiving_warehouse_name ||
-          last?.receivingWarehouseName ||
-          'Склад приёмки',
-        destinationWarehouse:
-          order.destination_warehouse?.name ||
-          order.destinationWarehouse?.name ||
-          last?.destination_warehouse?.name ||
-          last?.destinationWarehouse?.name ||
-          last?.destination_warehouse_name ||
-          last?.destinationWarehouseName ||
-          'Склад назначения',
-        items,
-        total: items.length,
-        accepted,
-        stored,
-        ready,
-        problems,
-        statuses,
-        updatedAt: last?.updated_at || last?.updatedAt || last?.created_at || last?.createdAt,
-      }
-    })
-    .sort((a, b) => {
-      const aNum = Number(a.id)
-      const bNum = Number(b.id)
-
-      if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
-        return bNum - aNum
-      }
-
-      return String(b.id).localeCompare(String(a.id), 'ru')
-    })
+  return map
 })
 
-const filteredOrders = computed(() => {
-  const q = search.value.trim().toLowerCase()
+const orderCards = computed(() => {
+  const map = new Map()
 
-  if (!q) {
-    return orderCards.value
+  for (const order of orders.value) {
+    const id = getOrderId(order)
+    if (!id) continue
+
+    map.set(id, {
+      id,
+      order,
+      cargo: cargoByOrder.value.get(id) || [],
+    })
   }
 
-  return orderCards.value.filter((order) => {
-    const text = [
-      order.id,
-      statusLabel(order.status),
-      order.receivingWarehouse,
-      order.destinationWarehouse,
-      order.transferType,
-      order.items.map((item) => `${item.id} ${item.qr_code || item.qrCode || ''}`).join(' '),
+  for (const [id, cargo] of cargoByOrder.value.entries()) {
+    if (map.has(id)) continue
+
+    map.set(id, {
+      id,
+      order: cargo[0]?.order || cargo[0]?.order_info || {},
+      cargo,
+    })
+  }
+
+  return Array.from(map.values())
+})
+
+const filteredOrderCards = computed(() => {
+  const q = orderSearch.value.trim().toLowerCase()
+
+  const result = orderCards.value.filter((card) => {
+    const status = orderStatusValue(card)
+    const statusOk = selectedStatus.value === 'all' || status === selectedStatus.value
+
+    const searchableText = [
+      card.id,
+      orderStatusLabel(card),
+      orderRouteTitle(card),
+      handoverTitle(card),
+      orderClientTitle(card),
+      orderAddressTitle(card),
+      card.order?.status,
+      ...card.cargo.map((item) => [qrValue(item), cargoTitle(item), statusLabel(item.status), zoneTitle(item), gateTitle(item)].join(' ')),
     ]
       .join(' ')
       .toLowerCase()
 
-    return text.includes(q)
+    return statusOk && (!q || searchableText.includes(q))
   })
+
+  return result.sort(sortOrderCards)
 })
 
 const selectedOrder = computed(() => {
-  return orderCards.value.find((order) => String(order.id) === String(selectedOrderId.value)) || null
+  if (selectedOrderId.value) {
+    return orderCards.value.find((card) => String(card.id) === String(selectedOrderId.value)) || null
+  }
+
+  return filteredOrderCards.value[0] || null
 })
 
-function selectOrder(orderId) {
-  selectedOrderId.value = String(orderId)
-  notice.value = ''
-  error.value = ''
+const selectedOrderCargo = computed(() => selectedOrder.value?.cargo || [])
+const selectedOrderQrCargo = computed(() => selectedOrderCargo.value.filter((item) => qrValue(item)))
+
+const selectedOrderStats = computed(() => {
+  const list = selectedOrderCargo.value
+
+  return {
+    total: list.length,
+    qr: selectedOrderQrCargo.value.length,
+    accepted: list.filter((item) => item.status === 'accepted').length,
+    stored: list.filter((item) => item.status === 'stored').length,
+    ship: list.filter((item) => ['ready_to_ship', 'assigned_to_shipping', 'assigned_to_shipment', 'shipped'].includes(item.status)).length,
+  }
+})
+
+function getOrderId(order) {
+  return String(order?.id || order?.order_id || order?.orderId || '')
+}
+
+function getCargoOrderId(item) {
+  return String(item?.order_id || item?.orderId || item?.order?.id || item?.order_info?.id || '')
 }
 
 function qrValue(item) {
   return item?.qr_code || item?.qrCode || ''
 }
 
-function orderStatusLabel(order) {
-  return order.status ? statusLabel(order.status) : 'Заявка'
+function orderStatusValue(card) {
+  const status = card.order?.status
+  if (status) return status
+
+  const cargo = card.cargo || []
+  if (!cargo.length) return 'created'
+  if (cargo.every((item) => item.status === 'shipped')) return 'shipped'
+  if (cargo.some((item) => ['ready_to_ship', 'assigned_to_shipping', 'assigned_to_shipment'].includes(item.status))) return 'ready_to_ship'
+  if (cargo.some((item) => item.status === 'stored')) return 'stored'
+  if (cargo.some((item) => item.status === 'accepted')) return 'accepted'
+
+  return 'created'
 }
 
-function transferLabel(value) {
-  const map = {
-    pickup: 'Забор с адреса',
-    self_delivery: 'Самостоятельная сдача',
+function orderStatusLabel(card) {
+  const status = orderStatusValue(card)
+  return orderStatusLabels[status] || statusLabel(status)
+}
+
+function orderStatusToneClass(card) {
+  return orderStatusTones[orderStatusValue(card)] || 'gray'
+}
+
+function orderDate(card) {
+  return (
+    card.order?.updated_at ||
+    card.order?.updatedAt ||
+    card.order?.created_at ||
+    card.order?.createdAt ||
+    card.cargo?.[0]?.updated_at ||
+    card.cargo?.[0]?.updatedAt ||
+    card.cargo?.[0]?.created_at ||
+    card.cargo?.[0]?.createdAt ||
+    ''
+  )
+}
+
+function warehouseName(value, keys, fallback = '') {
+  for (const key of keys) {
+    const field = value?.[key]
+    if (typeof field === 'string' && field.trim()) return field
+    if (field?.name) return field.name
   }
 
-  return map[value] || value || '—'
+  return fallback
+}
+
+function orderRouteTitle(card) {
+  const order = card.order || {}
+  const firstCargo = card.cargo?.[0] || {}
+  const nestedOrder = firstCargo.order || firstCargo.order_info || {}
+
+  const from =
+    warehouseName(order, ['receiving_warehouse', 'receivingWarehouse', 'receiving_warehouse_name', 'receivingWarehouseName']) ||
+    warehouseName(firstCargo, ['receiving_warehouse', 'receivingWarehouse', 'receiving_warehouse_name', 'receivingWarehouseName']) ||
+    warehouseName(nestedOrder, ['receiving_warehouse', 'receivingWarehouse', 'receiving_warehouse_name', 'receivingWarehouseName']) ||
+    'Склад приёмки'
+
+  const to =
+    warehouseName(order, ['destination_warehouse', 'destinationWarehouse', 'destination_warehouse_name', 'destinationWarehouseName']) ||
+    warehouseName(firstCargo, ['destination_warehouse', 'destinationWarehouse', 'destination_warehouse_name', 'destinationWarehouseName']) ||
+    warehouseName(nestedOrder, ['destination_warehouse', 'destinationWarehouse', 'destination_warehouse_name', 'destinationWarehouseName']) ||
+    'Склад назначения'
+
+  return `${from} → ${to}`
+}
+
+function handoverTitle(card) {
+  const type = card.order?.handover_type || card.order?.handoverType
+
+  if (type === 'pickup') return 'Забор с адреса'
+  if (type === 'self_delivery') return 'Сдача на склад'
+
+  return type || '—'
+}
+
+function orderClientTitle(card) {
+  const order = card.order || {}
+  const client = order.client || order.user || order.customer || {}
+
+  return (
+    order.client_name ||
+    order.clientName ||
+    order.customer_name ||
+    order.customerName ||
+    client.name ||
+    client.full_name ||
+    client.fullName ||
+    client.email ||
+    '—'
+  )
+}
+
+function orderAddressTitle(card) {
+  const order = card.order || {}
+
+  return (
+    order.pickup_address ||
+    order.pickupAddress ||
+    order.address ||
+    order.delivery_address ||
+    order.deliveryAddress ||
+    '—'
+  )
+}
+
+function sortOrderCards(a, b) {
+  if (orderSort.value === 'order_asc') return Number(a.id) - Number(b.id)
+  if (orderSort.value === 'order_desc') return Number(b.id) - Number(a.id)
+  if (orderSort.value === 'qr_asc') return a.cargo.length - b.cargo.length
+  if (orderSort.value === 'qr_desc') return b.cargo.length - a.cargo.length
+
+  const dateA = new Date(orderDate(a)).getTime() || 0
+  const dateB = new Date(orderDate(b)).getTime() || 0
+
+  if (orderSort.value === 'updated_asc') return dateA - dateB
+  return dateB - dateA
 }
 
 function cleanQuery(query) {
@@ -168,15 +313,12 @@ function cleanQuery(query) {
   )
 }
 
-function isSameQuery(nextQuery) {
+function sameQuery(nextQuery) {
   const current = cleanQuery(route.query)
   const currentKeys = Object.keys(current)
   const nextKeys = Object.keys(nextQuery)
 
-  return (
-    currentKeys.length === nextKeys.length &&
-    nextKeys.every((key) => String(current[key]) === String(nextQuery[key]))
-  )
+  return currentKeys.length === nextKeys.length && nextKeys.every((key) => String(current[key]) === String(nextQuery[key]))
 }
 
 function patchRouteQuery(patch) {
@@ -185,9 +327,7 @@ function patchRouteQuery(patch) {
     ...patch,
   })
 
-  if (isSameQuery(nextQuery)) {
-    return
-  }
+  if (sameQuery(nextQuery)) return
 
   router.replace({
     path: route.path,
@@ -196,32 +336,37 @@ function patchRouteQuery(patch) {
   })
 }
 
+function selectOrder(card) {
+  selectedOrderId.value = String(card.id)
+  patchRouteQuery({ order_id: card.id })
+}
+
 async function loadData() {
   loading.value = true
   error.value = ''
   notice.value = ''
 
   try {
-    // Важно: рабочий не запрашивает /orders, потому что этот эндпоинт может быть закрыт для роли worker.
-    // Берём доступные рабочему грузовые места и группируем их по заявкам.
-    const payload = await apiFetch('/cargo-items?limit=200', { auth: true })
-    cargoItems.value = normalizeCollection(payload, ['cargo_items', 'cargoItems', 'items', 'data'])
+    const [ordersPayload, cargoPayload] = await Promise.all([
+      apiFetch('/orders?limit=300', { auth: true }),
+      apiFetch('/cargo-items?limit=1000', { auth: true }),
+    ])
 
-    if (!selectedOrderId.value && orderCards.value.length) {
-      selectedOrderId.value = String(orderCards.value[0].id)
-    }
+    orders.value = normalizeCollection(ordersPayload)
+    cargoItems.value = normalizeCollection(cargoPayload)
 
-    if (selectedOrderId.value && !orderCards.value.some((order) => String(order.id) === String(selectedOrderId.value))) {
-      selectedOrderId.value = orderCards.value[0] ? String(orderCards.value[0].id) : ''
+    if (!selectedOrderId.value && filteredOrderCards.value.length) {
+      selectedOrderId.value = String(filteredOrderCards.value[0].id)
+      patchRouteQuery({ order_id: selectedOrderId.value })
     }
   } catch (err) {
-    error.value = err.message || 'Не удалось загрузить заявки рабочего'
+    error.value = err.message || 'Не удалось загрузить заявки'
   } finally {
     loading.value = false
   }
 }
 
-async function makeQrDataUrl(value) {
+async function qrDataUrl(value) {
   const qrModule = await import('qrcode')
   const QRCode = qrModule.default || qrModule
 
@@ -232,483 +377,423 @@ async function makeQrDataUrl(value) {
   })
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob)
+function dataUrlToBlob(dataUrl) {
+  const [meta, body] = dataUrl.split(',')
+  const mime = meta.match(/:(.*?);/)?.[1] || 'image/png'
+  const binary = atob(body)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
+  return new Blob([bytes], { type: mime })
+}
+
+function downloadDataUrl(dataUrl, filename) {
   const link = document.createElement('a')
-
-  link.href = url
+  link.href = dataUrl
   link.download = filename
-
   document.body.appendChild(link)
   link.click()
   link.remove()
-
-  URL.revokeObjectURL(url)
 }
 
-async function downloadOrderZip(order = selectedOrder.value) {
-  if (!order?.items?.length) {
-    error.value = 'Выберите заявку с грузовыми местами'
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+async function downloadOneQr(item) {
+  const value = qrValue(item)
+
+  if (!value) {
+    error.value = 'У грузового места нет QR-кода'
     return
   }
 
-  downloading.value = true
+  try {
+    error.value = ''
+    const dataUrl = await qrDataUrl(value)
+    downloadDataUrl(dataUrl, `${safeFileName(value)}.png`)
+    notice.value = `QR ${value} скачан`
+  } catch (err) {
+    error.value = err.message || 'Не удалось скачать QR-код'
+  }
+}
+
+async function downloadSelectedOrderArchive() {
+  if (!selectedOrder.value) {
+    error.value = 'Сначала выберите заявку'
+    return
+  }
+
+  if (!selectedOrderQrCargo.value.length) {
+    error.value = 'В выбранной заявке нет грузовых мест с QR-кодами'
+    return
+  }
+
+  archiveLoading.value = true
   error.value = ''
   notice.value = ''
 
   try {
-    const [{ default: JSZip }, qrModule] = await Promise.all([
-      import('jszip'),
-      import('qrcode'),
-    ])
-
-    const QRCode = qrModule.default || qrModule
+    const zipModule = await import('jszip')
+    const JSZip = zipModule.default || zipModule
     const zip = new JSZip()
-    const folderName = `order_${safeFileName(order.id)}_qr`
-    const folder = zip.folder(folderName)
 
-    for (const item of order.items) {
+    for (const item of selectedOrderQrCargo.value) {
       const value = qrValue(item)
-
-      if (!value) {
-        continue
-      }
-
-      const dataUrl = await QRCode.toDataURL(value, {
-        width: 900,
-        margin: 3,
-        errorCorrectionLevel: 'M',
-      })
-
-      folder.file(`${safeFileName(value)}.png`, dataUrl.split(',')[1], {
-        base64: true,
-      })
+      const dataUrl = await qrDataUrl(value)
+      zip.file(`${safeFileName(value)}.png`, dataUrlToBlob(dataUrl))
     }
 
-    folder.file(
-      'README.txt',
-      [
-        'Fulfillment Transit',
-        `QR-коды грузовых мест по заявке #${order.id}`,
-        `Всего мест: ${order.items.length}`,
-        '',
-        ...order.items.map(
-          (item) => `${qrValue(item)} — место #${item.id}, статус: ${statusLabel(item.status)}`,
-        ),
-      ].join('\n'),
-    )
-
     const blob = await zip.generateAsync({ type: 'blob' })
-    downloadBlob(blob, `${folderName}.zip`)
-    notice.value = `QR-архив для заявки #${order.id} скачан`
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `order-${safeFileName(selectedOrder.value.id)}-qr.zip`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    notice.value = `Архив QR-кодов заявки #${selectedOrder.value.id} скачан`
   } catch (err) {
-    error.value = err.message || 'Не удалось сформировать ZIP с QR-кодами'
+    error.value = err.message || 'Не удалось скачать архив с QR-кодами'
   } finally {
-    downloading.value = false
+    archiveLoading.value = false
   }
 }
 
-async function printOrderQr(order = selectedOrder.value) {
-  if (!order?.items?.length) {
-    error.value = 'Выберите заявку с грузовыми местами'
+async function printSelectedOrderQr() {
+  if (!selectedOrder.value) {
+    error.value = 'Сначала выберите заявку'
     return
   }
 
-  const printWindow = window.open('', '_blank', 'width=1100,height=780')
-
-  if (!printWindow) {
-    error.value = 'Браузер заблокировал окно печати. Разрешите всплывающие окна для сайта.'
+  if (!selectedOrderQrCargo.value.length) {
+    error.value = 'В выбранной заявке нет грузовых мест с QR-кодами'
     return
   }
 
-  printing.value = true
+  printLoading.value = true
   error.value = ''
   notice.value = ''
-
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="ru">
-      <head>
-        <meta charset="UTF-8" />
-        <title>QR заявки #${order.id}</title>
-        <style>
-          body { margin: 0; padding: 32px; font-family: Arial, sans-serif; color: #061126; }
-          .loading { font-size: 24px; font-weight: 800; }
-        </style>
-      </head>
-      <body><div class="loading">Готовим QR для печати…</div></body>
-    </html>
-  `)
-  printWindow.document.close()
 
   try {
     const labels = []
 
-    for (const item of order.items) {
+    for (const item of selectedOrderQrCargo.value) {
       const value = qrValue(item)
-
-      if (!value) {
-        continue
-      }
+      const dataUrl = await qrDataUrl(value)
 
       labels.push({
-        id: item.id,
-        status: statusLabel(item.status),
         qr: value,
-        title: cargoTitle(item),
-        image: await makeQrDataUrl(value),
+        dataUrl,
+        orderId: getCargoOrderId(item),
+        status: statusLabel(item.status),
+        zone: zoneTitle(item),
+        gate: gateTitle(item),
       })
     }
 
-    const html = `
+    const printWindow = window.open('', '_blank', 'width=1200,height=900')
+
+    if (!printWindow) {
+      error.value = 'Браузер заблокировал окно печати. Разрешите всплывающие окна.'
+      return
+    }
+
+    printWindow.document.write(`
       <!doctype html>
       <html lang="ru">
         <head>
-          <meta charset="UTF-8" />
-          <title>QR заявки #${order.id}</title>
+          <meta charset="utf-8">
+          <title>QR заявки #${escapeHtml(selectedOrder.value.id)}</title>
           <style>
             * { box-sizing: border-box; }
-            body {
-              margin: 0;
-              padding: 22px;
-              font-family: Arial, sans-serif;
-              color: #061126;
-              background: #fff;
-            }
-            .header {
-              margin-bottom: 18px;
-              padding-bottom: 14px;
-              border-bottom: 2px solid #061126;
-            }
-            .eyebrow {
-              margin: 0 0 6px;
-              color: #ff3f4d;
-              font-size: 12px;
-              font-weight: 900;
-              letter-spacing: .22em;
-              text-transform: uppercase;
-            }
-            h1 {
-              margin: 0;
-              font-size: 30px;
-              line-height: 1.1;
-            }
-            .meta {
-              margin-top: 8px;
-              font-size: 13px;
-              font-weight: 700;
-              color: #4b5563;
-            }
-            .grid {
-              display: grid;
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 12px;
-            }
-            .label {
-              min-height: 310px;
-              border: 2px solid #061126;
-              border-radius: 18px;
-              padding: 16px;
-              break-inside: avoid;
-              display: grid;
-              grid-template-columns: 160px minmax(0, 1fr);
-              gap: 16px;
-              align-items: center;
-            }
-            .label img {
-              width: 160px;
-              height: 160px;
-              object-fit: contain;
-            }
-            .label small {
-              display: block;
-              margin-bottom: 8px;
-              color: #ff3f4d;
-              font-size: 12px;
-              font-weight: 900;
-              letter-spacing: .18em;
-              text-transform: uppercase;
-            }
-            .label strong {
-              display: block;
-              margin-bottom: 10px;
-              font-size: 22px;
-              line-height: 1.15;
-              overflow-wrap: anywhere;
-            }
-            .label span {
-              display: block;
-              margin-top: 6px;
-              font-size: 14px;
-              font-weight: 800;
-              color: #4b5563;
-            }
-            @media print {
-              body { padding: 12mm; }
-              .grid { gap: 8mm; }
-              .label { border-radius: 8mm; page-break-inside: avoid; }
-            }
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; color: #061126; }
+            h1 { margin: 0 0 20px; font-size: 28px; }
+            .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+            .label { border: 2px solid #061126; border-radius: 18px; padding: 18px; min-height: 260px; page-break-inside: avoid; display: grid; grid-template-columns: 160px 1fr; gap: 18px; align-items: center; }
+            img { width: 160px; height: 160px; }
+            .eyebrow { margin: 0 0 8px; color: #ff3f4d; font-size: 12px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase; }
+            .qr { margin: 0 0 12px; font-size: 22px; font-weight: 900; word-break: break-word; }
+            dl { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+            dt { color: #64748b; font-weight: 700; }
+            dd { margin: 0 0 6px; font-weight: 900; }
+            @media print { body { padding: 12px; } .label { break-inside: avoid; } }
           </style>
         </head>
         <body>
-          <section class="header">
-            <p class="eyebrow">Fulfillment Transit</p>
-            <h1>QR-коды заявки #${order.id}</h1>
-            <div class="meta">
-              Всего мест: ${labels.length} · ${order.receivingWarehouse} → ${order.destinationWarehouse}
-            </div>
-          </section>
-
+          <h1>QR-коды заявки #${escapeHtml(selectedOrder.value.id)}</h1>
           <section class="grid">
             ${labels
               .map(
                 (label) => `
                   <article class="label">
-                    <img src="${label.image}" alt="${label.qr}" />
+                    <img src="${label.dataUrl}" alt="${escapeHtml(label.qr)}">
                     <div>
-                      <small>QR / место #${label.id}</small>
-                      <strong>${label.qr}</strong>
-                      <span>Заявка #${order.id}</span>
-                      <span>Статус: ${label.status}</span>
+                      <p class="eyebrow">Fulfillment Transit</p>
+                      <p class="qr">${escapeHtml(label.qr)}</p>
+                      <dl>
+                        <dt>Заявка</dt><dd>#${escapeHtml(label.orderId)}</dd>
+                        <dt>Статус</dt><dd>${escapeHtml(label.status)}</dd>
+                        <dt>Зона</dt><dd>${escapeHtml(label.zone)}</dd>
+                        <dt>Гейт</dt><dd>${escapeHtml(label.gate)}</dd>
+                      </dl>
                     </div>
                   </article>
                 `,
               )
               .join('')}
           </section>
-
           <script>
-            window.addEventListener('load', () => {
-              setTimeout(() => window.print(), 300)
-            })
+            window.addEventListener('load', () => setTimeout(() => window.print(), 300))
           <\/script>
         </body>
       </html>
-    `
+    `)
 
-    printWindow.document.open()
-    printWindow.document.write(html)
     printWindow.document.close()
-
-    notice.value = `Открыта печать QR для заявки #${order.id}`
+    notice.value = `Печатный лист заявки #${selectedOrder.value.id} открыт`
   } catch (err) {
-    printWindow.close()
-    error.value = err.message || 'Не удалось подготовить QR для печати'
+    error.value = err.message || 'Не удалось подготовить печать QR-кодов'
   } finally {
-    printing.value = false
+    printLoading.value = false
   }
 }
 
-watch(selectedOrderId, (orderId) => {
-  patchRouteQuery({
-    order_id: orderId || undefined,
-  })
+watch(selectedStatus, (status) => {
+  patchRouteQuery({ status: status === 'all' ? undefined : status })
 })
 
 watch(
   () => route.query.order_id,
-  (orderId) => {
-    if (orderId && String(orderId) !== String(selectedOrderId.value)) {
-      selectedOrderId.value = String(orderId)
-    }
+  (value) => {
+    selectedOrderId.value = String(value || '')
   },
 )
+
+watch(
+  () => route.query.status,
+  (value) => {
+    selectedStatus.value = String(value || 'all')
+  },
+)
+
+watch(filteredOrderCards, (cards) => {
+  if (!cards.length) return
+  if (selectedOrderId.value && cards.some((card) => String(card.id) === String(selectedOrderId.value))) return
+
+  selectedOrderId.value = String(cards[0].id)
+  patchRouteQuery({ order_id: selectedOrderId.value })
+})
 
 onMounted(loadData)
 </script>
 
 <template>
-  <section class="orders-page">
+  <section class="worker-orders-page">
     <header class="page-head">
       <div>
         <p class="eyebrow">Заявки склада</p>
-        <h1>Заявки</h1>
-        <span>
-          Выберите заявку слева — справа можно распечатать все QR-коды её грузовых мест
-          или скачать их одним ZIP-архивом.
-        </span>
+        <h1>Обработка заявок</h1>
+        <span>Два рабочих виджета: слева поиск нужной заявки, справа информация по выбранной заявке и действия с QR-кодами.</span>
       </div>
 
-      <button class="dark-btn" type="button" :disabled="loading" @click="loadData">
-        {{ loading ? 'Загрузка…' : 'Обновить' }}
-      </button>
+      <div class="head-actions">
+        <RouterLink class="red-btn" to="/worker/scan">Открыть QR-сканер</RouterLink>
+        <button class="light-btn" type="button" :disabled="loading" @click="loadData">
+          {{ loading ? 'Загрузка…' : 'Обновить' }}
+        </button>
+      </div>
     </header>
 
     <div v-if="error" class="alert error">{{ error }}</div>
     <div v-if="notice" class="alert success">{{ notice }}</div>
 
-    <section class="mini-stats">
-      <article>
-        <span>Заявок</span>
-        <strong>{{ counters.orders }}</strong>
-      </article>
-
-      <article>
-        <span>Грузовых мест</span>
-        <strong>{{ counters.places }}</strong>
-      </article>
-
-      <article>
-        <span>Принято</span>
-        <strong>{{ counters.accepted }}</strong>
-      </article>
-
-      <article>
-        <span>К отгрузке</span>
-        <strong>{{ counters.ready }}</strong>
-      </article>
-    </section>
-
-    <section class="orders-workspace">
-      <aside class="panel orders-panel">
-        <div class="panel-head compact">
+    <section class="orders-widgets">
+      <article class="widget search-widget">
+        <div class="widget-head">
           <div>
-            <p class="eyebrow">Выбор заявки</p>
-            <h2>Заявки</h2>
+            <p class="eyebrow">Виджет 1</p>
+            <h2>Поиск заявки</h2>
+            <span>Ищет по номеру заявки, QR-коду, складу, клиенту, адресу и статусу.</span>
           </div>
-
-          <span class="count-badge">{{ filteredOrders.length }}</span>
+          <strong class="count-badge">{{ filteredOrderCards.length }}</strong>
         </div>
 
-        <label class="search-field small">
-          <span>Поиск</span>
-          <input v-model.trim="search" type="text" placeholder="Номер заявки, QR или склад" />
-        </label>
+        <div class="order-controls">
+          <label class="field search-wide">
+            <span>Поиск</span>
+            <input v-model.trim="orderSearch" type="search" placeholder="Например: 104, QR-0007, склад, клиент" />
+          </label>
+
+          <label class="field">
+            <span>Статус</span>
+            <select v-model="selectedStatus">
+              <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Сортировка</span>
+            <select v-model="orderSort">
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
 
         <div v-if="loading" class="empty">Загружаем заявки…</div>
-        <div v-else-if="!filteredOrders.length" class="empty">Заявки не найдены.</div>
+        <div v-else-if="!filteredOrderCards.length" class="empty">Заявки не найдены. Попробуйте изменить поиск или статус.</div>
 
-        <div v-else class="orders-list">
+        <div v-else class="order-list">
           <button
-            v-for="order in filteredOrders"
-            :key="order.id"
+            v-for="card in filteredOrderCards"
+            :key="card.id"
             type="button"
             class="order-card"
-            :class="{ active: String(selectedOrderId) === String(order.id) }"
-            @click="selectOrder(order.id)"
+            :class="{ active: String(selectedOrder?.id) === String(card.id) }"
+            @click="selectOrder(card)"
           >
-            <span class="order-card__top">
-              <strong>Заявка #{{ order.id }}</strong>
-              <em>{{ order.total }} QR</em>
+            <span class="order-card-main">
+              <strong>Заявка #{{ card.id }}</strong>
+              <em>{{ orderRouteTitle(card) }}</em>
+              <small>{{ handoverTitle(card) }} · {{ formatDateTime(orderDate(card)) }}</small>
             </span>
 
-            <span class="order-card__route">
-              {{ order.receivingWarehouse }} → {{ order.destinationWarehouse }}
+            <span class="order-card-meta">
+              <span class="status-chip" :class="orderStatusToneClass(card)">{{ orderStatusLabel(card) }}</span>
+              <span class="qr-count">{{ card.cargo.length }} QR</span>
             </span>
-
-            <span class="order-card__meta">
-              <b>Принято: {{ order.accepted }}</b>
-              <b>Хранение: {{ order.stored }}</b>
-              <b>К отгрузке: {{ order.ready }}</b>
-              <b v-if="order.problems">Проблемы: {{ order.problems }}</b>
-            </span>
-
-            <small>Обновлено: {{ formatDateTime(order.updatedAt) }}</small>
           </button>
         </div>
-      </aside>
+      </article>
 
-      <section class="panel selected-panel">
+      <article class="widget process-widget">
         <template v-if="selectedOrder">
-          <div class="selected-head">
+          <div class="widget-head process-head">
             <div>
-              <p class="eyebrow">Печать QR</p>
+              <p class="eyebrow">Виджет 2</p>
               <h2>Заявка #{{ selectedOrder.id }}</h2>
-              <span>
-                В этой заявке {{ selectedOrder.total }} грузовых мест. Нажмите «Распечатать QR»,
-                чтобы открыть печатный лист со всеми QR-кодами заявки.
-              </span>
+              <span>Проверьте данные заявки, распечатайте QR-коды или скачайте их архивом.</span>
             </div>
-
-            <em :class="statusTone(selectedOrder.status)">
-              {{ orderStatusLabel(selectedOrder) }}
-            </em>
+            <span class="status-chip big" :class="orderStatusToneClass(selectedOrder)">{{ orderStatusLabel(selectedOrder) }}</span>
           </div>
 
-          <div class="selected-actions">
-            <button type="button" class="red-btn" :disabled="printing" @click="printOrderQr(selectedOrder)">
-              {{ printing ? 'Готовим…' : 'Распечатать QR' }}
+          <div class="actions-row">
+            <button class="red-btn" type="button" :disabled="printLoading || !selectedOrderQrCargo.length" @click="printSelectedOrderQr">
+              {{ printLoading ? 'Готовим печать…' : 'Распечатать QR-коды' }}
             </button>
 
-            <button type="button" class="dark-btn" :disabled="downloading" @click="downloadOrderZip(selectedOrder)">
-              {{ downloading ? 'Готовим ZIP…' : 'Скачать ZIP' }}
+            <button class="dark-btn" type="button" :disabled="archiveLoading || !selectedOrderQrCargo.length" @click="downloadSelectedOrderArchive">
+              {{ archiveLoading ? 'Собираем архив…' : 'Скачать ZIP с QR' }}
             </button>
           </div>
 
-          <div class="qr-summary">
+          <section class="stats-grid">
             <article>
-              <span>Всего QR</span>
-              <strong>{{ selectedOrder.total }}</strong>
+              <span>Всего мест</span>
+              <strong>{{ selectedOrderStats.total }}</strong>
             </article>
-
+            <article>
+              <span>С QR</span>
+              <strong>{{ selectedOrderStats.qr }}</strong>
+            </article>
             <article>
               <span>Принято</span>
-              <strong>{{ selectedOrder.accepted }}</strong>
+              <strong>{{ selectedOrderStats.accepted }}</strong>
             </article>
-
-            <article>
-              <span>На хранении</span>
-              <strong>{{ selectedOrder.stored }}</strong>
-            </article>
-
             <article>
               <span>К отгрузке</span>
-              <strong>{{ selectedOrder.ready }}</strong>
+              <strong>{{ selectedOrderStats.ship }}</strong>
             </article>
-          </div>
+          </section>
 
-          <div class="order-info">
-            <div>
+          <section class="info-grid">
+            <article>
+              <span>Маршрут</span>
+              <strong>{{ orderRouteTitle(selectedOrder) }}</strong>
+            </article>
+            <article>
               <span>Способ передачи</span>
-              <strong>{{ transferLabel(selectedOrder.transferType) }}</strong>
-            </div>
-
-            <div>
-              <span>Склад приёмки</span>
-              <strong>{{ selectedOrder.receivingWarehouse }}</strong>
-            </div>
-
-            <div>
-              <span>Склад назначения</span>
-              <strong>{{ selectedOrder.destinationWarehouse }}</strong>
-            </div>
-
-            <div>
-              <span>Дата</span>
-              <strong>{{ formatDateTime(selectedOrder.pickupDate || selectedOrder.updatedAt) }}</strong>
-            </div>
-          </div>
-
-          <div class="qr-preview">
-            <article v-for="item in selectedOrder.items" :key="item.id" class="qr-row">
-              <div>
-                <strong>{{ cargoTitle(item) }}</strong>
-                <span>Место #{{ item.id }} · заявка #{{ selectedOrder.id }}</span>
-              </div>
-
-              <em :class="statusTone(item.status)">{{ statusLabel(item.status) }}</em>
+              <strong>{{ handoverTitle(selectedOrder) }}</strong>
             </article>
-          </div>
+            <article>
+              <span>Клиент</span>
+              <strong>{{ orderClientTitle(selectedOrder) }}</strong>
+            </article>
+            <article>
+              <span>Адрес</span>
+              <strong>{{ orderAddressTitle(selectedOrder) }}</strong>
+            </article>
+            <article>
+              <span>Дата обновления</span>
+              <strong>{{ formatDateTime(orderDate(selectedOrder)) }}</strong>
+            </article>
+            <article>
+              <span>Статус</span>
+              <strong>{{ orderStatusLabel(selectedOrder) }}</strong>
+            </article>
+          </section>
+
+          <section class="cargo-block">
+            <div class="cargo-block-head">
+              <h3>QR-коды грузовых мест</h3>
+              <small>{{ selectedOrderQrCargo.length }} из {{ selectedOrderCargo.length }} доступны для печати и скачивания</small>
+            </div>
+
+            <div v-if="!selectedOrderCargo.length" class="empty">В этой заявке пока нет грузовых мест.</div>
+            <div v-else class="cargo-list">
+              <article v-for="item in selectedOrderCargo" :key="item.id || qrValue(item)" class="cargo-row">
+                <span class="cargo-main">
+                  <strong>{{ cargoTitle(item) }}</strong>
+                  <small>{{ statusLabel(item.status) }} · {{ zoneTitle(item) }} · {{ gateTitle(item) }}</small>
+                </span>
+
+                <div class="cargo-actions">
+                  <RouterLink
+                    v-if="qrValue(item)"
+                    class="soft-btn small"
+                    :to="`/cargo-items/by-qr/${encodeURIComponent(qrValue(item))}`"
+                  >
+                    Открыть
+                  </RouterLink>
+                  <button class="soft-btn small" type="button" :disabled="!qrValue(item)" @click="downloadOneQr(item)">
+                    QR PNG
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
         </template>
 
-        <template v-else>
-          <div class="empty large">Выберите заявку слева, чтобы распечатать её QR-коды.</div>
-        </template>
-      </section>
+        <div v-else class="empty big-empty">Выберите заявку в первом виджете, чтобы увидеть информацию и действия с QR-кодами.</div>
+      </article>
     </section>
   </section>
 </template>
 
 <style scoped>
-.orders-page {
+.worker-orders-page {
   display: grid;
   gap: 26px;
   color: #061126;
 }
 
 .page-head,
-.panel,
-.mini-stats article {
+.widget {
   background: #fff;
   border-radius: 34px;
   padding: 30px;
@@ -731,39 +816,58 @@ onMounted(loadData)
   text-transform: uppercase;
 }
 
-h1 {
+h1,
+h2,
+h3 {
   margin: 0;
-  font-size: clamp(56px, 7vw, 104px);
-  line-height: .88;
-  font-weight: 950;
-  letter-spacing: -.07em;
-}
-
-h2 {
-  margin: 0;
-  font-size: clamp(30px, 3vw, 48px);
-  line-height: 1;
   font-weight: 950;
   letter-spacing: -.05em;
 }
 
+h1 {
+  font-size: clamp(42px, 6vw, 78px);
+  line-height: .9;
+}
+
+h2 {
+  font-size: clamp(30px, 3vw, 46px);
+  line-height: .98;
+}
+
+h3 {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
 .page-head span,
-.selected-head span {
+.widget-head span {
   display: block;
   margin-top: 14px;
-  max-width: 820px;
+  max-width: 780px;
   color: #5d6d83;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.55;
   font-weight: 750;
 }
 
+.head-actions,
+.actions-row,
+.cargo-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .red-btn,
-.dark-btn {
+.dark-btn,
+.light-btn,
+.soft-btn {
   min-height: 58px;
   border: 0;
   border-radius: 20px;
-  padding: 0 24px;
+  padding: 0 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -785,10 +889,21 @@ h2 {
   color: #fff;
 }
 
-.red-btn:disabled,
-.dark-btn:disabled {
-  opacity: .6;
-  cursor: wait;
+.light-btn,
+.soft-btn {
+  background: #eef3f9;
+  color: #061126;
+}
+
+.soft-btn.small {
+  min-height: 44px;
+  border-radius: 16px;
+  font-size: 14px;
+}
+
+button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 
 .alert,
@@ -813,82 +928,105 @@ h2 {
   color: #64748b;
 }
 
-.empty.large {
-  min-height: 360px;
+.big-empty {
+  min-height: 420px;
   display: grid;
   place-items: center;
   text-align: center;
 }
 
-.mini-stats {
+.orders-widgets {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(360px, .95fr) minmax(520px, 1.35fr);
+  gap: 26px;
+  align-items: start;
 }
 
-.mini-stats article {
-  display: grid;
-  gap: 8px;
-  min-height: 130px;
-  align-content: center;
-}
-
-.mini-stats span,
-.search-field span,
-.qr-summary span,
-.order-info span {
-  color: #97a5bb;
-  font-size: 13px;
-  font-weight: 950;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-}
-
-.mini-stats strong {
-  font-size: 44px;
-  line-height: 1;
-  font-weight: 950;
-  letter-spacing: -.05em;
-}
-
-.orders-workspace {
-  --workspace-height: clamp(620px, calc(100vh - 180px), 760px);
-  display: grid;
-  grid-template-columns: minmax(360px, .72fr) minmax(0, 1.28fr);
-  gap: 22px;
-  align-items: stretch;
-}
-
-.panel-head {
+.widget-head,
+.process-head,
+.cargo-block-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 18px;
 }
 
-.panel-head.compact {
-  align-items: flex-start;
+.count-badge,
+.status-chip,
+.qr-count {
+  border-radius: 999px;
+  background: #eef3f9;
+  color: #061126;
+  padding: 11px 16px;
+  font-weight: 950;
+  white-space: nowrap;
 }
 
-.count-badge {
-  min-width: 52px;
-  height: 52px;
-  border-radius: 18px;
+.status-chip.big {
+  padding: 14px 20px;
+  font-size: 16px;
+}
+
+.status-chip.green {
+  background: #d7f9e4;
+  color: #047857;
+}
+
+.status-chip.blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-chip.violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.status-chip.dark {
   background: #061126;
   color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 950;
 }
 
-.search-field {
+.status-chip.red {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.status-chip.amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-chip.gray {
+  background: #eef3f9;
+  color: #475569;
+}
+
+.order-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.field {
   display: grid;
   gap: 10px;
-  margin-bottom: 16px;
 }
 
-.search-field input {
+.field span,
+.stats-grid span,
+.info-grid span {
+  color: #97a5bb;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select {
   width: 100%;
   min-height: 58px;
   border: 1px solid #dbe4ef;
@@ -896,25 +1034,25 @@ h2 {
   background: #f8fbff;
   color: #061126;
   padding: 0 18px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
   box-sizing: border-box;
   outline: none;
 }
 
-.search-field input:focus {
+.field input:focus,
+.field select:focus {
   border-color: #ff3f4d;
   box-shadow: 0 0 0 5px rgba(255, 63, 77, .12);
   background: #fff;
 }
 
-.orders-list {
+.order-list {
   display: grid;
   gap: 12px;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 4px 8px 4px 0;
-  scroll-padding-top: 4px;
+  max-height: 720px;
+  overflow: auto;
+  padding-right: 6px;
 }
 
 .order-card {
@@ -922,254 +1060,183 @@ h2 {
   border: 1px solid #dbe4ef;
   border-radius: 24px;
   background: #f8fbff;
-  color: #061126;
   padding: 18px;
+  color: #061126;
   text-align: left;
-  cursor: pointer;
   display: grid;
-  gap: 12px;
-  box-sizing: border-box;
-  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-.order-card:hover:not(.active) {
-  border-color: rgba(255, 63, 77, .45);
-}
-
-.order-card:focus-visible {
-  outline: 3px solid rgba(255, 63, 77, .32);
-  outline-offset: 2px;
+.order-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .08);
 }
 
 .order-card.active {
   background: #061126;
   color: #fff;
-  border-color: rgba(255, 255, 255, .28);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, .18),
-    0 18px 44px rgba(6, 17, 38, .18);
+  border-color: #061126;
+  box-shadow: 0 18px 46px rgba(6, 17, 38, .22);
 }
 
-.order-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.order-card-main,
+.order-card-meta,
+.cargo-main {
+  display: grid;
+  gap: 8px;
 }
 
-.order-card strong {
-  font-size: 22px;
+.order-card-main strong {
+  font-size: 24px;
   font-weight: 950;
 }
 
-.order-card em,
-em {
-  border-radius: 999px;
-  padding: 10px 14px;
+.order-card-main em {
+  color: #5d6d83;
   font-style: normal;
-  font-weight: 950;
-  white-space: nowrap;
-  text-align: center;
+  font-weight: 900;
 }
 
-.order-card em {
-  background: #e8fff5;
-  color: #047857;
+.order-card-main small,
+.cargo-row small,
+.cargo-block-head small {
+  color: #64748b;
+  font-weight: 850;
 }
 
-.order-card.active em {
+.order-card.active .order-card-main em,
+.order-card.active .order-card-main small {
+  color: rgba(255, 255, 255, .72);
+}
+
+.order-card.active .qr-count {
   background: #ff3f4d;
   color: #fff;
 }
 
-.order-card__route {
-  color: #5d6d83;
-  font-weight: 850;
-  line-height: 1.4;
+.order-card-meta {
+  justify-items: end;
+  align-content: start;
 }
 
-.order-card.active .order-card__route {
-  color: #dbeafe;
-}
-
-.order-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.order-card__meta b {
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: #eef3f9;
-  color: #5d6d83;
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.order-card.active .order-card__meta b {
-  background: rgba(255, 255, 255, .1);
-  color: #dbeafe;
-}
-
-.order-card small {
-  color: #6b7a90;
-  font-weight: 850;
-}
-
-.order-card.active small {
-  color: #a9b8ca;
-}
-
-.orders-panel,
-.selected-panel {
-  height: var(--workspace-height);
-  min-height: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-.orders-panel {
+.process-widget {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-.selected-panel {
-  display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  gap: 22px;
-}
-
-.selected-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 18px;
 }
 
-.selected-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.actions-row {
+  justify-content: flex-start;
 }
 
-.qr-summary {
+.stats-grid,
+.info-grid {
   display: grid;
+  gap: 14px;
+}
+
+.stats-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
 }
 
-.qr-summary article,
-.order-info div,
-.qr-row {
-  border-radius: 22px;
-  background: #f6f9fd;
-  padding: 18px;
-}
-
-.qr-summary article {
-  display: grid;
-  gap: 7px;
-}
-
-.qr-summary strong {
-  font-size: 30px;
-  font-weight: 950;
-}
-
-.order-info {
-  display: grid;
+.info-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stats-grid article,
+.info-grid article {
+  background: #f6f9fd;
+  border-radius: 24px;
+  padding: 22px;
+  display: grid;
   gap: 12px;
 }
 
-.order-info div {
-  display: grid;
-  gap: 8px;
-}
-
-.order-info strong {
-  font-size: 17px;
-  line-height: 1.35;
+.stats-grid strong {
+  font-size: 34px;
+  line-height: 1;
   font-weight: 950;
 }
 
-.qr-preview {
+.info-grid strong {
+  font-size: 19px;
+  line-height: 1.3;
+  font-weight: 950;
+}
+
+.cargo-block {
+  display: grid;
+  gap: 14px;
+}
+
+.cargo-block-head {
+  margin-bottom: 0;
+}
+
+.cargo-list {
   display: grid;
   gap: 10px;
-  min-height: 0;
-  overflow-y: auto;
+  max-height: 420px;
+  overflow: auto;
   padding-right: 6px;
 }
 
-.qr-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+.cargo-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-radius: 20px;
+  background: #f6f9fd;
+  padding: 16px 18px;
 }
 
-.qr-row strong {
-  display: block;
+.cargo-row strong {
   font-size: 18px;
   font-weight: 950;
-  overflow-wrap: anywhere;
 }
-
-.qr-row span {
-  display: block;
-  margin-top: 5px;
-  color: #66758a;
-  font-weight: 800;
-}
-
-em.green { background: #dcfce7; color: #047857; }
-em.red { background: #ffe4e6; color: #be123c; }
-em.blue { background: #dbeafe; color: #1d4ed8; }
-em.amber { background: #fef3c7; color: #b45309; }
-em.violet { background: #ede9fe; color: #6d28d9; }
-em.dark { background: #061126; color: #fff; }
-em.gray { background: #e2e8f0; color: #475569; }
 
 @media (max-width: 1180px) {
-  .orders-workspace,
-  .order-info {
+  .orders-widgets,
+  .stats-grid,
+  .info-grid {
     grid-template-columns: 1fr;
   }
 
-  .orders-panel,
-  .selected-panel {
-    height: auto;
+  .order-list,
+  .cargo-list {
     max-height: none;
-    overflow: visible;
-  }
-
-  .qr-preview,
-  .orders-list {
-    max-height: none;
-    overflow: visible;
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .page-head,
-  .selected-head {
+  .widget-head,
+  .process-head,
+  .cargo-block-head,
+  .cargo-row,
+  .order-card {
+    grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
   }
 
-  .mini-stats,
-  .qr-summary {
-    grid-template-columns: 1fr;
+  .head-actions,
+  .actions-row,
+  .cargo-actions,
+  .order-card-meta {
+    justify-content: stretch;
+    justify-items: stretch;
   }
 
   .red-btn,
-  .dark-btn {
+  .dark-btn,
+  .light-btn,
+  .soft-btn {
     width: 100%;
-  }
-
-  .qr-row {
-    grid-template-columns: 1fr;
   }
 }
 </style>

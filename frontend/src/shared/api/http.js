@@ -1,4 +1,8 @@
 const DEFAULT_API_BASE_URL = '/api/v1'
+const ME_CACHE_TTL_MS = 60_000
+
+let meRequestPromise = null
+let meCacheTime = 0
 
 function normalizeBaseUrl(value) {
   const raw = value || DEFAULT_API_BASE_URL
@@ -25,12 +29,9 @@ function parseJwtPayload(token) {
     const [, payload] = String(token).split('.')
     if (!payload) return null
 
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=')
-
     return JSON.parse(
       decodeURIComponent(
-        atob(padded)
+        atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
           .split('')
           .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
           .join(''),
@@ -75,23 +76,38 @@ export function getCurrentRole() {
   return String(getCurrentUser()?.role || '').toLowerCase()
 }
 
+function setCurrentUser(user, notify = true) {
+  if (!user) return null
+
+  const normalized = {
+    ...user,
+    role: String(user.role || '').toLowerCase(),
+  }
+
+  localStorage.setItem('current_user', JSON.stringify(normalized))
+  if (notify) notifyAuthChanged()
+  return normalized
+}
+
 export function clearAuth() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('current_user')
+  meRequestPromise = null
+  meCacheTime = 0
   notifyAuthChanged()
 }
 
-function isTokenExpired(token, skewMs = 0) {
+function isTokenExpired(token) {
   const payload = parseJwtPayload(token)
   if (!payload?.exp) return false
-  return Number(payload.exp) * 1000 <= Date.now() + skewMs
+  return Number(payload.exp) * 1000 <= Date.now()
 }
 
 function redirectToMainScreen() {
   if (typeof window === 'undefined') return
-  const currentPath = window.location.pathname
-  if (currentPath !== '/') window.location.assign('/')
+  if (window.location.pathname === '/') return
+  window.location.assign('/')
 }
 
 export function expireSessionAndGoHome() {
@@ -101,6 +117,7 @@ export function expireSessionAndGoHome() {
 
 function normalizeUser(payload, token) {
   const user = payload?.user || payload?.me || payload?.profile || payload || null
+
   if (user && typeof user === 'object' && (user.email || user.full_name || user.role)) {
     return {
       ...user,
@@ -157,15 +174,11 @@ export function saveAuth(payload = {}) {
   if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
 
   const user = normalizeUser(payload, accessToken)
-  if (user) localStorage.setItem('current_user', JSON.stringify(user))
+  if (user) setCurrentUser(user)
 
-  notifyAuthChanged()
+  meCacheTime = Date.now()
 
-  return {
-    accessToken,
-    refreshToken,
-    user,
-  }
+  return { accessToken, refreshToken, user }
 }
 
 export function cabinetPathByRole(role) {
@@ -174,103 +187,6 @@ export function cabinetPathByRole(role) {
   if (currentRole === 'worker' || currentRole === 'warehouse_worker') return '/worker'
   if (currentRole === 'logist' || currentRole === 'logistician') return '/logist'
   return '/client'
-}
-
-let refreshPromise = null
-
-function sessionExpiredError() {
-  const error = new Error('Сессия истекла. Выполните вход снова.')
-  error.status = 401
-  return error
-}
-
-async function refreshAccessToken() {
-  if (refreshPromise) return refreshPromise
-
-  refreshPromise = (async () => {
-    const refreshToken = getRefreshToken()
-
-    if (!refreshToken || isTokenExpired(refreshToken, 5000)) {
-      expireSessionAndGoHome()
-      throw sessionExpiredError()
-    }
-
-    const response = await fetch(buildUrl('/auth/refresh'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
-
-    const text = await response.text()
-    let data = null
-
-    if (text) {
-      try {
-        data = JSON.parse(text)
-      } catch {
-        data = { message: text }
-      }
-    }
-
-    if (!response.ok) {
-      expireSessionAndGoHome()
-      const error = new Error(data?.error || data?.message || data?.detail || 'Сессия истекла. Выполните вход снова.')
-      error.status = response.status
-      error.data = data
-      throw error
-    }
-
-    const auth = saveAuth(data || {})
-    if (!auth.accessToken) {
-      expireSessionAndGoHome()
-      throw sessionExpiredError()
-    }
-
-    return auth.accessToken
-  })()
-
-  try {
-    return await refreshPromise
-  } finally {
-    refreshPromise = null
-  }
-}
-
-async function getValidAccessToken() {
-  const accessToken = getAccessToken()
-
-  if (!accessToken) {
-    expireSessionAndGoHome()
-    throw sessionExpiredError()
-  }
-
-  if (isTokenExpired(accessToken, 5000)) {
-    return refreshAccessToken()
-  }
-
-  return accessToken
-}
-
-async function parseResponse(response) {
-  const text = await response.text()
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { message: text }
-  }
-}
-
-async function makeRequest(path, method, requestHeaders, requestBody) {
-  const response = await fetch(buildUrl(path), {
-    method,
-    headers: requestHeaders,
-    body: requestBody,
-  })
-
-  const data = await parseResponse(response)
-  return { response, data }
 }
 
 export async function apiFetch(path, options = {}) {
@@ -284,22 +200,32 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (auth) {
-    const token = await getValidAccessToken()
+    const token = getAccessToken()
+
+    if (!token || isTokenExpired(token)) {
+      expireSessionAndGoHome()
+      const error = new Error('Сессия истекла. Выполните вход снова.')
+      error.status = 401
+      throw error
+    }
+
     requestHeaders.set('Authorization', `Bearer ${token}`)
   }
 
-  let { response, data } = await makeRequest(path, method, requestHeaders, requestBody)
+  const response = await fetch(buildUrl(path), {
+    method,
+    headers: requestHeaders,
+    body: requestBody,
+  })
 
-  const shouldTryRefresh = auth && (response.status === 401 || isTokenErrorPayload(data))
+  const text = await response.text()
+  let data = null
 
-  if (shouldTryRefresh) {
+  if (text) {
     try {
-      const token = await refreshAccessToken()
-      requestHeaders.set('Authorization', `Bearer ${token}`)
-      ;({ response, data } = await makeRequest(path, method, requestHeaders, requestBody))
-    } catch (error) {
-      expireSessionAndGoHome()
-      throw error
+      data = JSON.parse(text)
+    } catch {
+      data = { message: text }
     }
   }
 
@@ -316,12 +242,49 @@ export async function apiFetch(path, options = {}) {
   return data
 }
 
-// Не делает сетевой запрос. Нужен для старых импортов, чтобы больше не спамить /auth/me.
-export async function loadMe() {
-  const user = getCurrentUser()
-  if (user) {
-    localStorage.setItem('current_user', JSON.stringify(user))
-    notifyAuthChanged()
+// Без спама /auth/me: по умолчанию берём пользователя из localStorage/JWT.
+// Сетевой запрос делается только если нет кеша или передан { force: true }.
+// Одновременные вызовы склеиваются в один запрос, повторные вызовы в течение минуты берут кеш.
+export async function loadMe(options = {}) {
+  const force = Boolean(options?.force)
+  const cachedUser = getCurrentUser()
+  const freshCache = Date.now() - meCacheTime < ME_CACHE_TTL_MS
+
+  if (cachedUser && !force) return cachedUser
+  if (cachedUser && freshCache && !force) return cachedUser
+  if (meRequestPromise) return meRequestPromise
+
+  const token = getAccessToken()
+  if (!token || isTokenExpired(token)) return null
+
+  meRequestPromise = apiFetch('/auth/me', { auth: true })
+    .then((payload) => {
+      const user = normalizeUser(payload, token)
+      meCacheTime = Date.now()
+      if (user) return setCurrentUser(user, false)
+      return cachedUser || userFromToken(token)
+    })
+    .finally(() => {
+      meRequestPromise = null
+    })
+
+  return meRequestPromise
+}
+
+
+// Совместимость с роутером: если где-то импортируется ensureAuthSession,
+// фронтенд не должен падать из-за отсутствующего named export.
+// Функция не спамит /auth/me: сначала берёт пользователя из localStorage/JWT,
+// а сетевой запрос делает только через loadMe(), где есть кеш и склейка запросов.
+export async function ensureAuthSession(options = {}) {
+  const token = getAccessToken()
+
+  if (!token) return null
+
+  if (isTokenExpired(token)) {
+    expireSessionAndGoHome()
+    return null
   }
-  return user
+
+  return loadMe(options)
 }

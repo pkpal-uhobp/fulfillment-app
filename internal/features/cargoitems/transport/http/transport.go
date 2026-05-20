@@ -94,6 +94,24 @@ func NewCargoItemsHTTPHandler(
 }
 
 func (h *CargoItemsHTTPHandler) Routes() []core_http_server.Route {
+	clientWorkerLogistAdminRoles := []string{
+		core_domain.RoleClient.String(),
+		core_domain.RoleWorker.String(),
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+
+	workerLogistAdminRoles := []string{
+		core_domain.RoleWorker.String(),
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+
+	logistAdminRoles := []string{
+		core_domain.RoleLogist.String(),
+		core_domain.RoleAdmin.String(),
+	}
+
 	return []core_http_server.Route{
 		core_http_server.NewRoute(
 			http.MethodPost,
@@ -108,87 +126,49 @@ func (h *CargoItemsHTTPHandler) Routes() []core_http_server.Route {
 			http.MethodGet,
 			"/cargo-items",
 			h.ListCargoItems,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
-
-		// Клиент тоже может проверять QR, но service.ScanCargoItem вызывает ListCargoItems,
-		// где клиент ограничивается только грузовыми местами своих заявок.
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/scan",
 			h.ScanCargoItem,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}",
 			h.GetCargoItem,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}/label",
 			h.GetCargoItemLabel,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			workerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodGet,
 			"/cargo-items/{id}/history",
 			h.GetCargoItemHistory,
-			[]string{
-				core_domain.RoleClient.String(),
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			clientWorkerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/status",
 			h.UpdateCargoItemStatus,
-			[]string{
-				core_domain.RoleWorker.String(),
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			workerLogistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/assign-zone",
 			h.AssignStorageZone,
-			[]string{
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			logistAdminRoles,
 		),
 		core_http_server.NewRoute(
 			http.MethodPatch,
 			"/cargo-items/{id}/assign-gate",
 			h.AssignGate,
-			[]string{
-				core_domain.RoleLogist.String(),
-				core_domain.RoleAdmin.String(),
-			},
+			logistAdminRoles,
 		),
 	}
 }

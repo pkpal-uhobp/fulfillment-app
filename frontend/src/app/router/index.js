@@ -28,15 +28,18 @@ import WorkerDashboardPage from '@/pages/worker/WorkerDashboardPage.vue'
 import WorkerOrdersPage from '@/pages/worker/WorkerOrdersPage.vue'
 import WorkerScanPage from '@/pages/worker/WorkerScanPage.vue'
 import WorkerCargoItemsPage from '@/pages/worker/WorkerCargoItemsPage.vue'
+import WorkerProfilePage from '@/pages/worker/WorkerProfilePage.vue'
 
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import AdminDashboardPage from '@/pages/admin/AdminDashboardPage.vue'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage.vue'
 import AdminWarehousesPage from '@/pages/admin/AdminWarehousesPage.vue'
+import AdminProfilePage from '@/pages/admin/AdminProfilePage.vue'
 
 import CargoItemDetailsPage from '@/pages/cargo/CargoItemDetailsPage.vue'
 import NotFoundPage from '@/pages/errors/NotFoundPage.vue'
-import { getAccessToken, getCurrentUser } from '@/shared/api/http'
+
+import { ensureAuthSession, getAccessToken, getCurrentUser } from '@/shared/api/http'
 
 const routes = [
   {
@@ -56,6 +59,7 @@ const routes = [
       { path: '', name: 'admin-dashboard', component: AdminDashboardPage },
       { path: 'users', name: 'admin-users', component: AdminUsersPage },
       { path: 'warehouses', name: 'admin-warehouses', component: AdminWarehousesPage },
+      { path: 'profile', name: 'admin-profile', component: AdminProfilePage },
     ],
   },
   {
@@ -95,68 +99,53 @@ const routes = [
       { path: 'orders', name: 'worker-orders', component: WorkerOrdersPage },
       { path: 'scan', name: 'worker-scan', component: WorkerScanPage },
       { path: 'cargo-items', name: 'worker-cargo-items', component: WorkerCargoItemsPage },
-      { path: 'profile', name: 'worker-profile', redirect: '/worker' },
+      { path: 'profile', name: 'worker-profile', component: WorkerProfilePage },
     ],
   },
   {
-    path: '/cargo-items/by-qr/:qr',
+    path: '/cargo-items/by-qr/:qrCode',
     name: 'cargo-by-qr',
     component: CargoItemDetailsPage,
     props: true,
     meta: { requiresAuth: true },
   },
-  {
-    path: '/:pathMatch(.*)*',
-    name: 'not-found',
-    component: NotFoundPage,
-  },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    }
-
-    if (to.hash) {
-      return {
-        el: to.hash,
-        top: 96,
-        behavior: 'smooth',
-      }
-    }
-
-    if (to.path === from.path) {
-      return false
-    }
-
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, top: 96, behavior: 'smooth' }
+    if (to.path === from.path) return false
     return { top: 0 }
   },
 })
 
 function homeForRole(role) {
-  if (role === 'admin') return '/admin'
-  if (role === 'worker' || role === 'warehouse_worker') return '/worker'
-  if (role === 'logist' || role === 'logistician') return '/logist'
-
+  const normalized = String(role || '').toLowerCase()
+  if (normalized === 'admin') return '/admin'
+  if (normalized === 'worker' || normalized === 'warehouse_worker') return '/worker'
+  if (normalized === 'logist' || normalized === 'logistician') return '/logist'
   return '/client'
 }
 
-router.beforeEach((to) => {
-  if (to.meta.requiresAuth && !getAccessToken()) {
-    return { name: 'landing' }
+router.beforeEach(async (to) => {
+  if (to.meta.requiresAuth) {
+    if (!getAccessToken()) {
+      const refreshed = await ensureAuthSession()
+      if (!refreshed) return { name: 'login' }
+    } else {
+      const valid = await ensureAuthSession()
+      if (!valid) return { name: 'login' }
+    }
   }
 
   const allowed = to.meta.roles
-
   if (allowed?.length) {
     const role = String(getCurrentUser()?.role || '').toLowerCase()
-
-    if (role && !allowed.includes(role)) {
-      return homeForRole(role)
-    }
+    if (role && !allowed.includes(role)) return homeForRole(role)
   }
 
   return true

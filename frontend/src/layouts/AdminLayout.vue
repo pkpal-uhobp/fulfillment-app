@@ -14,26 +14,20 @@ const adminItems = [
   { to: '/admin/warehouses', label: 'Склады и зоны', icon: '▤' },
 ]
 
-
 const initials = computed(() => {
-  const source = user.value?.full_name || user.value?.email || 'Администратор'
-
-  return (
-    source
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'АД'
-  )
+  const name = user.value?.full_name || user.value?.email || 'Администратор'
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'АД'
 })
 
-const displayName = computed(() => user.value?.full_name || user.value?.email || 'Администратор')
+const displayName = computed(() => user.value?.full_name || user.value?.email || 'Пользователь')
 
 function isActive(item) {
   if (item.exact) return route.path === item.to
-
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
@@ -56,7 +50,6 @@ onMounted(refreshMe)
 <template>
   <div class="admin-shell">
     <div v-if="menuOpen" class="admin-backdrop" @click="menuOpen = false"></div>
-
     <button class="burger" type="button" @click="menuOpen = true">☰</button>
 
     <aside class="admin-sidebar" :class="{ open: menuOpen }">
@@ -83,13 +76,13 @@ onMounted(refreshMe)
         </RouterLink>
       </nav>
 
-      <div class="admin-user-card">
+      <RouterLink class="admin-user-card" to="/admin/profile" aria-label="Открыть профиль" @click="menuOpen = false">
         <div class="admin-avatar">{{ initials }}</div>
         <div>
           <strong>{{ displayName }}</strong>
           <span>администратор системы</span>
         </div>
-      </div>
+      </RouterLink>
 
       <button class="logout-btn" type="button" @click="logout">Выйти</button>
     </aside>
@@ -123,6 +116,12 @@ onMounted(refreshMe)
   top: 0;
 }
 
+.admin-brand,
+.admin-user-card {
+  text-decoration: none;
+  color: #fff;
+}
+
 .admin-brand {
   min-height: 70px;
   border-radius: 24px;
@@ -130,8 +129,6 @@ onMounted(refreshMe)
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #fff;
-  text-decoration: none;
   background: rgba(255, 255, 255, .08);
   border: 1px solid rgba(255, 255, 255, .08);
 }
@@ -214,7 +211,6 @@ onMounted(refreshMe)
   color: #fff;
 }
 
-
 .admin-user-card {
   margin-top: auto;
   border-radius: 24px;
@@ -223,6 +219,12 @@ onMounted(refreshMe)
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.admin-user-card:hover {
+  background: rgba(255, 255, 255, .14);
+  transform: translateY(-1px);
 }
 
 .admin-avatar {
@@ -247,46 +249,56 @@ onMounted(refreshMe)
   cursor: pointer;
 }
 
+.logout-btn:hover {
+  background: #ff3f4d;
+}
+
 .admin-main {
   min-width: 0;
   padding: 30px;
   display: grid;
   gap: 26px;
-  align-content: start;
 }
 
-.burger {
-  display: none;
-  position: fixed;
-  top: 18px;
-  left: 18px;
-  z-index: 25;
-  width: 52px;
-  height: 52px;
-  border: 0;
-  border-radius: 18px;
-  background: #061126;
-  color: #fff;
-  font-size: 22px;
-  font-weight: 950;
-  box-shadow: 0 18px 46px rgba(6, 17, 38, .22);
-}
-
+.burger,
 .admin-backdrop {
   display: none;
 }
 
-@media (max-width: 1060px) {
+@media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
   }
 
-  .admin-sidebar {
+  .burger {
+    display: block;
     position: fixed;
     z-index: 40;
+    left: 16px;
+    top: 16px;
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 16px;
+    background: #ff3f4d;
+    color: #fff;
+    font-weight: 950;
+  }
+
+  .admin-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(6, 17, 38, .55);
+  }
+
+  .admin-sidebar {
+    position: fixed;
     inset: 0 auto 0 0;
-    width: min(330px, 86vw);
-    transform: translateX(-105%);
+    z-index: 50;
+    width: min(320px, calc(100vw - 40px));
+    transform: translateX(-110%);
     transition: transform .2s ease;
   }
 
@@ -294,23 +306,8 @@ onMounted(refreshMe)
     transform: translateX(0);
   }
 
-  .admin-backdrop {
-    display: block;
-    position: fixed;
-    z-index: 30;
-    inset: 0;
-    background: rgba(6, 17, 38, .55);
-  }
-
-  .burger {
-    display: grid;
-    place-items: center;
-  }
-}
-
-@media (max-width: 700px) {
   .admin-main {
-    padding: 86px 16px 16px;
+    padding: 80px 16px 24px;
   }
 }
 </style>
